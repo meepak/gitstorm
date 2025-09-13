@@ -58,8 +58,11 @@ export class GitService {
 
     async getBranches(): Promise<Branch[]> {
         try {
+            console.log('Getting branches...');
             const branches = await this.git.branch(['-a', '-v']);
+            console.log('Branch data:', branches);
             const current = await this.git.revparse(['--abbrev-ref', 'HEAD']);
+            console.log('Current branch:', current);
             const branchesList: Branch[] = [];
 
             // Parse local branches
@@ -72,12 +75,8 @@ export class GitService {
                         isCurrent: branch.name === current,
                         commit: branch.commit
                     });
-                }
-            }
-
-            // Parse remote branches
-            for (const [name, branch] of Object.entries(branches.branches)) {
-                if (branch.name.includes('/') && !branch.name.startsWith('remotes/')) {
+                } else if (branch.name.startsWith('remotes/')) {
+                    // Parse remote branches
                     const remoteName = branch.name.replace(/^remotes\//, '');
                     branchesList.push({
                         name: remoteName,
@@ -112,12 +111,20 @@ export class GitService {
 
     async getCommits(branch?: string, limit: number = 100): Promise<Commit[]> {
         try {
-            const options: any = ['--oneline', '--graph', '--decorate', `-n${limit}`];
+            console.log('Getting commits for branch:', branch, 'limit:', limit);
+            
+            // Use raw git command to get commits for specific branch
+            let log;
             if (branch) {
-                options.push(branch);
+                // Use raw git command for specific branch
+                const result = await this.git.raw(['log', `--max-count=${limit}`, '--pretty=format:%H|%an|%ad|%s|%P', '--date=iso', branch]);
+                log = this.parseRawGitLog(result);
+            } else {
+                // For current branch, use simple-git log
+                log = await this.git.log({ maxCount: limit });
             }
 
-            const log = await this.git.log(options);
+            console.log('Commit log data:', log);
             const commits: Commit[] = [];
 
             for (const commit of log.all) {
@@ -132,6 +139,7 @@ export class GitService {
                 });
             }
 
+            console.log(`Loaded ${commits.length} commits for branch: ${branch || 'current'}`);
             return commits;
         } catch (error) {
             console.error('Error getting commits:', error);
@@ -139,26 +147,85 @@ export class GitService {
         }
     }
 
+    private parseRawGitLog(rawOutput: string): any {
+        const commits: any[] = [];
+        const lines = rawOutput.trim().split('\n');
+        
+        for (const line of lines) {
+            if (line.trim()) {
+                const parts = line.split('|');
+                if (parts.length >= 4) {
+                    commits.push({
+                        hash: parts[0],
+                        author_name: parts[1],
+                        date: parts[2],
+                        message: parts[3],
+                        parent: parts[4] || '',
+                        refs: ''
+                    });
+                }
+            }
+        }
+        
+        return { all: commits };
+    }
+
+    async getCurrentCommit(): Promise<Commit | null> {
+        try {
+            const log = await this.git.log({ maxCount: 1 });
+            if (log.all && log.all.length > 0) {
+                const commit = log.all[0];
+                return {
+                    hash: commit.hash,
+                    shortHash: commit.hash.substring(0, 7),
+                    author: commit.author_name,
+                    date: new Date(commit.date),
+                    message: commit.message,
+                    parents: (commit as any).parent ? [(commit as any).parent] : [],
+                    refs: this.parseRefs(commit.refs)
+                };
+            }
+            return null;
+        } catch (error) {
+            console.error('Error getting current commit:', error);
+            return null;
+        }
+    }
+
     async getCommitDetails(hash: string): Promise<Commit | null> {
         try {
-            const show = await this.git.show([hash, '--stat']);
-            const commit = await this.git.log({ from: hash, to: hash, maxCount: 1 });
+            console.log('getCommitDetails called with hash:', hash);
             
-            if (commit.all.length === 0) {
+            // Get commit details and file changes
+            const [log, showStat] = await Promise.all([
+                this.git.log({ from: hash, maxCount: 1 }),
+                this.git.show([hash, '--stat'])
+            ]);
+    
+            console.log('Git log result:', log);
+            const commitData = log.all[0];
+            if (!commitData) {
+                console.log('No commit data found for hash:', hash);
                 return null;
             }
-
-            const commitData = commit.all[0];
-            const files = this.parseFileChanges(show);
-
+    
+            console.log('Found commit data:', commitData);
+    
+            // Get parent hashes
+            const parentsRaw = await this.git.raw(['show', '-s', '--pretty=%P', hash]);
+            const parents = parentsRaw.trim() ? parentsRaw.trim().split(/\s+/) : [];
+    
+            const files = this.parseFileChanges(showStat);
+            console.log('Parsed files:', files);
+    
             return {
                 hash: commitData.hash,
                 shortHash: commitData.hash.substring(0, 7),
                 message: commitData.message,
                 author: commitData.author_name,
                 date: new Date(commitData.date),
-                parents: (commitData as any).parent ? [(commitData as any).parent] : [],
-                refs: this.parseRefs(commitData.refs),
+                parents,
+                refs: this.parseRefs(commitData.refs || ''),
                 files
             };
         } catch (error) {
@@ -166,14 +233,16 @@ export class GitService {
             return null;
         }
     }
+    
 
     async getFileDiff(hash: string, file?: string): Promise<string> {
         try {
-            const options = [hash];
+            // Get diff between the commit and its parent
+            const options = [`${hash}~1..${hash}`];
             if (file) {
                 options.push('--', file);
             }
-            return await this.git.show(options);
+            return await this.git.diff(options);
         } catch (error) {
             console.error('Error getting file diff:', error);
             return '';
@@ -300,11 +369,15 @@ export class GitService {
 
     async getMultiCommitFiles(commitHashes: string[]): Promise<FileChange[]> {
         try {
+            console.log('getMultiCommitFiles called with hashes:', commitHashes);
             const allFiles = new Map<string, FileChange>();
             
             for (const hash of commitHashes) {
+                console.log('Processing hash in getMultiCommitFiles:', hash);
                 const commit = await this.getCommitDetails(hash);
+                console.log('Got commit for multi-commit files:', commit);
                 if (commit && commit.files) {
+                    console.log('Files for hash', hash, ':', commit.files.length);
                     for (const file of commit.files) {
                         if (allFiles.has(file.file)) {
                             const existing = allFiles.get(file.file)!;
@@ -318,7 +391,9 @@ export class GitService {
                 }
             }
             
-            return Array.from(allFiles.values());
+            const result = Array.from(allFiles.values());
+            console.log('getMultiCommitFiles returning:', result.length, 'files');
+            return result;
         } catch (error) {
             console.error('Error getting multi-commit files:', error);
             return [];
@@ -348,62 +423,77 @@ export class GitService {
 
     private parseFileChanges(showOutput: string): FileChange[] {
         const files: FileChange[] = [];
-        const lines = showOutput.split('\n');
-        
-        // Find the stats section
-        let inStats = false;
-        for (const line of lines) {
-            if (line.includes(' files changed')) {
-                inStats = true;
-                continue;
-            }
-            
-            if (inStats && line.trim() === '') {
-                break;
-            }
-            
-            if (inStats && line.includes('|')) {
-                const parts = line.split('|');
-                if (parts.length >= 2) {
-                    const filePart = parts[0].trim();
-                    const statsPart = parts[1].trim();
-                    
-                    // Extract file name and status
-                    const fileMatch = filePart.match(/^(.+?)(\s+\([^)]+\))?$/);
-                    const file = fileMatch ? fileMatch[1] : filePart;
-                    
-                    // Extract additions/deletions
-                    const statsMatch = statsPart.match(/(\d+)\s+([+-])/g);
-                    let additions = 0;
-                    let deletions = 0;
-                    
-                    if (statsMatch) {
-                        for (const stat of statsMatch) {
-                            const match = stat.match(/(\d+)\s+([+-])/);
-                            if (match) {
-                                const count = parseInt(match[1]);
-                                if (match[2] === '+') {
-                                    additions = count;
-                                } else {
-                                    deletions = count;
-                                }
-                            }
-                        }
-                    }
-                    
-                    files.push({
-                        file,
-                        additions,
-                        deletions,
-                        changes: additions + deletions,
-                        status: this.getFileStatus(filePart)
-                    });
+        const lines = showOutput.split(/\r?\n/);
+    
+        for (const raw of lines) {
+            const line = raw.trimEnd();
+    
+            // Stop at the summary line like: "3 files changed, 12 insertions(+), 2 deletions(-)"
+            if (/^\s*\d+\s+files?\s+changed\b/i.test(line)) break;
+    
+            // Per-file stat lines contain a pipe and aren't blank
+            if (!line || line.indexOf('|') === -1) continue;
+    
+            const [filePartRaw, statsRaw] = line.split('|');
+            if (!statsRaw) continue;
+    
+            // Clean file segment:
+            // - drop trailing "(xx%)"
+            // - trim
+            const filePart = filePartRaw.replace(/\s+\([^)]+\)\s*$/, '').trim();
+            const file = filePart; // keep rename text literal; or post-process if you prefer only the final path
+    
+            const statsPart = statsRaw.trim();
+    
+            let additions = 0;
+            let deletions = 0;
+            let changes = 0;
+    
+            // Binary changes: "Bin 0 -> 123 bytes"
+            if (/^Bin\b/i.test(statsPart)) {
+                // keep additions/deletions at 0; mark as modified via status
+                changes = 0;
+            } else {
+                // First integer is the total changed lines for this file
+                const totalMatch = statsPart.match(/^(\d+)/);
+                if (totalMatch) {
+                    changes = parseInt(totalMatch[1], 10) || 0;
+                }
+    
+                // Bar has + and - characters; git scales them, so use proportional split
+                const plusChars  = (statsPart.match(/\+/g) || []).length;
+                const minusChars = (statsPart.match(/-/g) || []).length;
+    
+                if (plusChars + minusChars > 0 && changes > 0) {
+                    const totalChars = plusChars + minusChars;
+                    additions = Math.round((plusChars / totalChars) * changes);
+                    deletions = changes - additions;
+                } else if (/\b\+\b/.test(statsPart) && changes > 0 && minusChars === 0) {
+                    // Some themes show just a trailing '+' with the number
+                    additions = changes;
+                    deletions = 0;
+                } else if (/\b-\b/.test(statsPart) && changes > 0 && plusChars === 0) {
+                    additions = 0;
+                    deletions = changes;
+                } else if (changes > 0) {
+                    // Fallback when bar is absent — assume additions
+                    additions = changes;
+                    deletions = 0;
                 }
             }
+    
+            files.push({
+                file,
+                additions,
+                deletions,
+                changes,
+                status: this.getFileStatus(filePartRaw) // keep your existing status resolver
+            });
         }
-        
+    
         return files;
     }
+    
 
     private getFileStatus(filePart: string): FileChange['status'] {
         if (filePart.includes('new file')) return 'A';

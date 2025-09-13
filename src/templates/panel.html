@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitStorm Panel</title>
+    <!-- CSS_PLACEHOLDER -->
+</head>
+<body>
+    <div class="header">
+        <h1>GitStorm</h1>
+        <button onclick="refreshData()">Refresh</button>
+        <button class="squash-button" id="squashButton" onclick="showSquashDialog()">Squash Selected</button>
+    </div>
+    
+    <div class="main-content">
+        <div class="panel branches-panel">
+            <div class="panel-header">Branches</div>
+            <div class="panel-content">
+                <div class="search-container">
+                    <input type="text" placeholder="Search branches..." />
+                    <button class="clear-search" onclick="clearSearch()" title="Clear search">×</button>
+                </div>
+                <div id="branchesContent">
+                    <div class="loading">Loading branches...</div>
+                </div>
+            </div>
+            <div class="resize-handle" data-panel="branches"></div>
+        </div>
+        
+        <div class="panel commits-panel">
+            <div class="panel-header">Commits</div>
+            <div class="panel-content">
+                <div class="commits-filters">
+                    <div class="search-container">
+                        <input type="text" placeholder="Search commits..." />
+                        <button class="clear-search" onclick="clearCommitsSearch()" title="Clear search">×</button>
+                    </div>
+                    <select class="user-filter" onchange="filterByUser(this.value)">
+                        <option value="all">All</option>
+                    </select>
+                </div>
+                <div id="commitsContent">
+                    <div class="loading">Loading commits...</div>
+                </div>
+            </div>
+            <div class="resize-handle" data-panel="commits"></div>
+        </div>
+        
+        <div class="panel files-panel">
+            <div class="panel-header">File Changes</div>
+            <div class="panel-content">
+                <div id="filesContent">
+                    <div class="empty-state">
+                        <h3>No selection</h3>
+                        <p>Select a commit to view file changes</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- JS_PLACEHOLDER -->
+    <!-- INITIAL_PANEL_SIZES_PLACEHOLDER -->
+</body>
+</html>

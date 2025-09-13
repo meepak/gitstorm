@@ -1,0 +1,1002 @@
+// GitStorm Panel Controller
+class PanelController {
+    constructor() {
+        this.vscode = window.acquireVsCodeApi();
+        this.currentBranch = null;
+        this.selectedCommits = new Set();
+        this.commits = [];
+        this.branches = [];
+        this.searchTerm = '';
+        this.commitsSearchTerm = '';
+        this.selectedUser = 'all';
+        this.panelSizes = { branches: 280, commits: 400 };
+        this.searchTimeout = null;
+        this.commitsSearchTimeout = null;
+        this.initialize();
+    }
+
+    initialize() {
+        console.log('GitStorm WebView loaded!');
+        this.setupEventListeners();
+        this.setupResizeHandlers();
+        this.setupMutationObserver();
+        
+        // Send a test message to the extension
+        this.vscode.postMessage({ command: 'test', data: 'WebView is ready' });
+    }
+
+    setupEventListeners() {
+        // Message listener for content updates
+        window.addEventListener('message', (event) => {
+            const message = event.data;
+            console.log('WebView received message:', message);
+            console.log('Message command:', message.command);
+            switch (message.command) {
+                case 'updateContent':
+                    console.log('Processing updateContent:', { branches: message.branches?.length, commits: message.commits?.length, error: message.error });
+                    this.updateContent(message.branches, message.commits, message.error);
+                    break;
+                case 'updatePanelSizes':
+                    this.panelSizes = message.sizes;
+                    this.restorePanelSizes();
+                    break;
+                case 'commitDetails':
+                    console.log('Frontend: Received commitDetails message');
+                    console.log('Frontend: Commit:', message.commit);
+                    console.log('Frontend: Files:', message.files);
+                    console.log('Frontend: Files length:', message.files ? message.files.length : 'undefined');
+                    this.updateFileChangesPanel(message.commit, message.files);
+                    break;
+                case 'multiCommitFiles':
+                    console.log('Received multi-commit files:', message.files);
+                    this.updateFileChangesPanel(null, message.files);
+                    break;
+                default:
+                    console.log('WebView received unknown message command:', message.command);
+                    break;
+            }
+        });
+
+        // DOM ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                console.log('DOM Content Loaded!');
+                this.restorePanelSizes();
+                this.setupSearchHandlers();
+            });
+        } else {
+            console.log('DOM already loaded!');
+            this.restorePanelSizes();
+            this.setupSearchHandlers();
+            this.setupCommitsSearchHandlers();
+        }
+    }
+
+    setupResizeHandlers() {
+        const resizeHandles = document.querySelectorAll('.resize-handle');
+        
+        resizeHandles.forEach(handle => {
+            let isResizing = false;
+            let startX = 0;
+            let startWidth = 0;
+            
+            handle.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                startX = e.clientX;
+                
+                const panel = handle.closest('.panel');
+                startWidth = panel.offsetWidth;
+                
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+                
+                e.preventDefault();
+            });
+            
+            document.addEventListener('mousemove', (e) => {
+                if (!isResizing) return;
+                
+                const deltaX = e.clientX - startX;
+                const newWidth = Math.max(150, Math.min(600, startWidth + deltaX));
+                
+                const panel = handle.closest('.panel');
+                const panelType = handle.getAttribute('data-panel');
+                
+                if (panelType === 'branches') {
+                    panel.style.width = newWidth + 'px';
+                    this.panelSizes.branches = newWidth;
+                } else if (panelType === 'commits') {
+                    panel.style.width = newWidth + 'px';
+                    this.panelSizes.commits = newWidth;
+                }
+            });
+            
+            document.addEventListener('mouseup', () => {
+                if (isResizing) {
+                    isResizing = false;
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
+                    this.savePanelSizes();
+                }
+            });
+        });
+    }
+
+    setupMutationObserver() {
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'childList' || mutation.type === 'subtree') {
+                    const branchesContent = document.getElementById('branchesContent');
+                    const commitsContent = document.getElementById('commitsContent');
+                    
+                    if (branchesContent || commitsContent) {
+                        console.log('Content changed, restoring panel sizes...');
+                        setTimeout(() => {
+                            this.restorePanelSizes();
+                        }, 50);
+                    }
+                }
+            });
+        });
+        
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: false
+        });
+    }
+
+    updateContent(branches, commits, error) {
+        console.log('Updating content:', { branches: branches?.length, commits: commits?.length, error });
+        
+        // Store branches for search filtering
+        if (branches && branches.length > 0) {
+            this.branches = branches;
+        }
+        
+        // Update branches content
+        const branchesContent = document.getElementById('branchesContent');
+        if (branchesContent) {
+            if (error) {
+                branchesContent.innerHTML = `<div class="empty-state"><h3>Error</h3><p>${error}</p></div>`;
+            } else if (branches && branches.length > 0) {
+                branchesContent.innerHTML = this.generateBranchesHtml(branches, this.currentBranch, this.searchTerm);
+            } else {
+                branchesContent.innerHTML = '<div class="loading">Loading branches...</div>';
+            }
+        }
+        
+        // Update commits content
+        const commitsContent = document.getElementById('commitsContent');
+        if (commitsContent) {
+            if (error) {
+                commitsContent.innerHTML = `<div class="empty-state"><h3>Error</h3><p>${error}</p></div>`;
+            } else if (commits && commits.length > 0) {
+                this.commits = commits;
+                this.populateUserFilter(commits);
+                commitsContent.innerHTML = this.generateCommitsHtml(commits, this.commitsSearchTerm, this.selectedUser);
+            } else {
+                commitsContent.innerHTML = '<div class="loading">Loading commits...</div>';
+            }
+        }
+    }
+
+    generateBranchesHtml(branches, selectedBranch, searchTerm = '') {
+        if (!branches || branches.length === 0) {
+            return '<div class="empty-state"><h3>No branches found</h3></div>';
+        }
+
+        // Filter branches based on search term
+        const filteredBranches = branches.filter(branch => {
+            const searchLower = searchTerm.toLowerCase();
+            const branchNameLower = branch.name.toLowerCase();
+            
+            // For remote branches, also search the branch name without origin prefix
+            if (branch.isRemote) {
+                const branchNameOnly = branch.name.split('/').slice(1).join('/').toLowerCase();
+                return branchNameLower.includes(searchLower) || branchNameOnly.includes(searchLower);
+            }
+            
+            return branchNameLower.includes(searchLower);
+        });
+
+        // If no branches match the search, show message
+        if (filteredBranches.length === 0 && searchTerm.length > 0) {
+            return `<div class="empty-state"><h3>No branches match "${searchTerm}"</h3></div>`;
+        }
+
+        // Separate local and remote branches
+        const localBranches = filteredBranches.filter(branch => branch.isLocal && !branch.isRemote);
+        const remoteBranches = filteredBranches.filter(branch => branch.isRemote);
+
+        // Group remote branches by origin
+        const remoteGroups = {};
+        remoteBranches.forEach(branch => {
+            const parts = branch.name.split('/');
+            const origin = parts[0] || 'origin';
+            if (!remoteGroups[origin]) {
+                remoteGroups[origin] = [];
+            }
+            remoteGroups[origin].push(branch);
+        });
+
+        let html = '';
+
+        // Local branches section
+        if (localBranches.length > 0) {
+            html += `
+                <div class="tree-section">
+                    <div class="tree-section-header" onclick="toggleSection('local')">
+                        <div class="tree-toggle">▼</div>
+                        <div class="tree-section-title">Local</div>
+                    </div>
+                    <div class="tree-section-content" id="local-content">
+                        ${this.generateBranchItemsHtml(localBranches, selectedBranch)}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Remote branches sections
+        Object.keys(remoteGroups).sort().forEach(origin => {
+            const originBranches = remoteGroups[origin];
+            html += `
+                <div class="tree-section">
+                    <div class="tree-section-header" onclick="toggleSection('${origin}')">
+                        <div class="tree-toggle">▼</div>
+                        <div class="tree-section-title">Remote</div>
+                        <div class="tree-section-subtitle">${origin}</div>
+                    </div>
+                    <div class="tree-section-content" id="${origin}-content">
+                        ${this.generateBranchItemsHtml(originBranches, selectedBranch)}
+                    </div>
+                </div>
+            `;
+        });
+
+        // If we have a search term but no results in any section, show message
+        if (searchTerm.length > 0 && localBranches.length === 0 && Object.keys(remoteGroups).length === 0) {
+            html = `<div class="empty-state"><h3>No branches match "${searchTerm}"</h3></div>`;
+        }
+
+        return html;
+    }
+
+    generateBranchItemsHtml(branches, selectedBranch) {
+        return branches.map(branch => {
+            const isSelected = (selectedBranch && branch.name === selectedBranch) || 
+                              (!selectedBranch && branch.isCurrent);
+            const highlightClass = isSelected ? 'current' : '';
+            const typeIcon = branch.isRemote ? '🌐' : '🌿';
+            const refs = branch.ahead || branch.behind ? 
+                `+${branch.ahead || 0} -${branch.behind || 0}` : '';
+
+            // For remote branches, show only the branch name without origin
+            const displayName = branch.isRemote ? branch.name.split('/').slice(1).join('/') : branch.name;
+
+            return `
+                <div class="branch-item ${highlightClass}" onclick="selectBranch('${branch.name}')">
+                    <div class="branch-icon">${typeIcon}</div>
+                    <div class="branch-name">${displayName}</div>
+                    <div class="branch-refs">${refs}</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    generateCommitsHtml(commits, searchTerm = '', selectedUser = 'all') {
+        if (!commits || commits.length === 0) {
+            return '<div class="empty-state"><h3>No commits found</h3></div>';
+        }
+
+        // Filter commits based on search term and user
+        let filteredCommits = commits;
+        
+        if (searchTerm.length > 0) {
+            filteredCommits = filteredCommits.filter(commit => 
+                commit.message.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+        
+        if (selectedUser !== 'all') {
+            filteredCommits = filteredCommits.filter(commit => 
+                commit.author.toLowerCase().includes(selectedUser.toLowerCase())
+            );
+        }
+
+        // If no commits match the filters, show message
+        if (filteredCommits.length === 0) {
+            let message = 'No commits found';
+            if (searchTerm.length > 0 || selectedUser !== 'all') {
+                message = 'No commits match the current filters';
+            }
+            return `<div class="empty-state"><h3>${message}</h3></div>`;
+        }
+
+        // Generate commits with proper DAG graph
+        const commitsHtml = filteredCommits.map((commit, index) => {
+            console.log('Processing commit for display:', { hash: commit.hash, shortHash: commit.shortHash, message: commit.message });
+            
+            let date = 'Invalid Date';
+            let time = '';
+            try {
+                if (commit.date) {
+                    const dateObj = new Date(commit.date);
+                    if (!isNaN(dateObj.getTime())) {
+                        date = dateObj.toLocaleDateString();
+                        time = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    }
+                }
+            } catch (e) {
+                console.error('Date parsing error:', e);
+            }
+            
+            const refs = commit.refs ? commit.refs.join(', ') : '';
+            
+            // Determine DAG graph type
+            const isMerge = (commit.parents && commit.parents.length > 1) || 
+                           (commit.message && commit.message.toLowerCase().includes('merge'));
+            const isFirst = index === filteredCommits.length - 1; // Last commit in list is first chronologically
+            const dagClass = isMerge ? 'dag-merge' : (isFirst ? 'dag-first' : 'dag-commit');
+            
+            // Debug logging
+            if (isMerge) {
+                console.log('Merge commit detected:', commit.message, 'parents:', commit.parents);
+            }
+            
+            return `
+                <div class="commit-item" onclick="selectCommit('${commit.hash}', event)" data-commit-index="${index}">
+                    <div class="commit-graph">
+                        <div class="dag-commit ${dagClass}"></div>
+                    </div>
+                    <div class="commit-content">
+                        <div>
+                            <span class="commit-hash">${commit.shortHash}</span>
+                            <span class="commit-message">${commit.message}</span>
+                        </div>
+                        <div class="commit-meta">
+                            <span class="commit-author">${commit.author}</span>
+                            <span class="commit-date">${date} ${time}</span>
+                            ${refs ? `<span class="commit-refs">${refs}</span>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // Wrap in a container with CSS-based DAG graph
+        return `
+            <div class="commits-container">
+                ${commitsHtml}
+            </div>
+        `;
+    }
+
+
+    restorePanelSizes() {
+        const branchesPanel = document.querySelector('.branches-panel');
+        const commitsPanel = document.querySelector('.commits-panel');
+        
+        console.log('Restoring panel sizes:', this.panelSizes);
+        
+        if (branchesPanel) {
+            branchesPanel.style.width = this.panelSizes.branches + 'px';
+            console.log('Set branches panel width to:', this.panelSizes.branches + 'px');
+        }
+        if (commitsPanel) {
+            commitsPanel.style.width = this.panelSizes.commits + 'px';
+            console.log('Set commits panel width to:', this.panelSizes.commits + 'px');
+        }
+    }
+
+    savePanelSizes() {
+        this.vscode.postMessage({
+            command: 'savePanelSizes',
+            sizes: this.panelSizes
+        });
+    }
+
+    setupSearchHandlers() {
+        const searchInput = document.querySelector('.branches-panel input[type="text"]');
+        console.log('Looking for search input:', searchInput);
+        
+        if (searchInput) {
+            // Check if handlers are already set up
+            if (this.searchHandlersSetup) {
+                console.log('Search handlers already setup, skipping');
+                return;
+            }
+            
+            console.log('Search input found, setting up handler');
+            
+            // Add the new event listener
+            this.handleSearchInput = (e) => {
+                const newSearchTerm = e.target.value;
+                const hadText = this.searchTerm.length > 0;
+                const hasText = newSearchTerm.length > 0;
+                
+                // Update search term immediately for clear button visibility
+                this.searchTerm = newSearchTerm;
+                
+                // Only update clear button visibility if it actually needs to change
+                if (hadText !== hasText) {
+                    const clearButton = document.querySelector('.branches-panel .clear-search');
+                    if (clearButton) {
+                        clearButton.style.display = hasText ? 'flex' : 'none';
+                        console.log('Clear button visibility changed to:', hasText ? 'visible' : 'hidden');
+                    }
+                }
+                
+                // Debounce the actual filtering to prevent excessive updates
+                if (this.searchTimeout) {
+                    clearTimeout(this.searchTimeout);
+                }
+                
+                this.searchTimeout = setTimeout(() => {
+                    console.log('Search term changed to:', this.searchTerm);
+                    this.filterBranches();
+                }, 150); // 150ms debounce
+            };
+            
+            searchInput.addEventListener('input', this.handleSearchInput);
+            console.log('Search event listener attached');
+            
+            // Mark handlers as setup
+            this.searchHandlersSetup = true;
+            
+            // Set initial clear button state based on current search term
+            const clearButton = document.querySelector('.branches-panel .clear-search');
+            if (clearButton) {
+                clearButton.style.display = this.searchTerm.length > 0 ? 'flex' : 'none';
+                console.log('Initial clear button state:', clearButton.style.display);
+            }
+        } else {
+            console.log('Search input not found! Available inputs:', document.querySelectorAll('input'));
+        }
+    }
+
+    setupCommitsSearchHandlers() {
+        const commitsSearchInput = document.querySelector('.commits-panel input[type="text"]');
+        console.log('Looking for commits search input:', commitsSearchInput);
+        
+        if (commitsSearchInput) {
+            // Check if handlers are already set up
+            if (this.commitsSearchHandlersSetup) {
+                console.log('Commits search handlers already setup, skipping');
+                return;
+            }
+            
+            console.log('Commits search input found, setting up handler');
+            
+            // Add the new event listener
+            this.handleCommitsSearchInput = (e) => {
+                const newSearchTerm = e.target.value;
+                const hadText = this.commitsSearchTerm.length > 0;
+                const hasText = newSearchTerm.length > 0;
+                
+                // Update search term immediately for clear button visibility
+                this.commitsSearchTerm = newSearchTerm;
+                
+                // Only update clear button visibility if it actually needs to change
+                if (hadText !== hasText) {
+                    const clearButton = document.querySelector('.commits-panel .clear-search');
+                    if (clearButton) {
+                        clearButton.style.display = hasText ? 'flex' : 'none';
+                        console.log('Commits clear button visibility changed to:', hasText ? 'visible' : 'hidden');
+                    }
+                }
+                
+                // Debounce the actual filtering to prevent excessive updates
+                if (this.commitsSearchTimeout) {
+                    clearTimeout(this.commitsSearchTimeout);
+                }
+                
+                this.commitsSearchTimeout = setTimeout(() => {
+                    console.log('Commits search term changed to:', this.commitsSearchTerm);
+                    this.filterCommits();
+                }, 150); // 150ms debounce
+            };
+            
+            commitsSearchInput.addEventListener('input', this.handleCommitsSearchInput);
+            console.log('Commits search event listener attached');
+            
+            // Mark handlers as setup
+            this.commitsSearchHandlersSetup = true;
+            
+            // Set initial clear button state
+            const clearButton = document.querySelector('.commits-panel .clear-search');
+            if (clearButton) {
+                clearButton.style.display = this.commitsSearchTerm.length > 0 ? 'flex' : 'none';
+                console.log('Initial commits clear button state:', clearButton.style.display);
+            }
+        } else {
+            console.log('Commits search input not found! Available inputs:', document.querySelectorAll('input'));
+        }
+    }
+
+    filterBranches() {
+        if (this.branches.length === 0) {
+            console.log('No branches available for filtering');
+            return;
+        }
+        
+        console.log('Filtering branches with search term:', this.searchTerm);
+        const branchesContent = document.getElementById('branchesContent');
+        if (branchesContent) {
+            const newHtml = this.generateBranchesHtml(this.branches, this.currentBranch, this.searchTerm);
+            branchesContent.innerHTML = newHtml;
+            
+            // If we're searching, auto-expand all sections to show results
+            if (this.searchTerm.length > 0) {
+                setTimeout(() => {
+                    const allContentElements = document.querySelectorAll('.tree-section-content');
+                    allContentElements.forEach(content => {
+                        content.classList.remove('collapsed');
+                        const header = content.previousElementSibling;
+                        if (header) {
+                            header.classList.remove('collapsed');
+                        }
+                    });
+                }, 10);
+            }
+            
+            console.log('Updated branches content');
+        } else {
+            console.log('branchesContent element not found');
+        }
+    }
+
+    filterCommits() {
+        if (this.commits.length === 0) {
+            console.log('No commits available for filtering');
+            return;
+        }
+        
+        console.log('Filtering commits with search term:', this.commitsSearchTerm, 'and user:', this.selectedUser);
+        const commitsContent = document.getElementById('commitsContent');
+        if (commitsContent) {
+            const newHtml = this.generateCommitsHtml(this.commits, this.commitsSearchTerm, this.selectedUser);
+            commitsContent.innerHTML = newHtml;
+            console.log('Updated commits content');
+        } else {
+            console.log('commitsContent element not found');
+        }
+    }
+
+    populateUserFilter(commits) {
+        const userFilter = document.querySelector('.user-filter');
+        if (!userFilter) return;
+
+        // Get unique authors from commits
+        const authors = [...new Set(commits.map(commit => commit.author))].sort();
+        
+        // Clear existing options except "All"
+        userFilter.innerHTML = '<option value="all">All</option>';
+        
+        // Add author options
+        authors.forEach(author => {
+            const option = document.createElement('option');
+            option.value = author;
+            option.textContent = author;
+            userFilter.appendChild(option);
+        });
+        
+        // Set current selection
+        userFilter.value = this.selectedUser;
+    }
+
+    toggleSection(sectionId) {
+        const content = document.getElementById(`${sectionId}-content`);
+        const header = document.querySelector(`[onclick="toggleSection('${sectionId}')"]`);
+        
+        if (content && header) {
+            const isCollapsed = content.classList.contains('collapsed');
+            
+            if (isCollapsed) {
+                content.classList.remove('collapsed');
+                header.classList.remove('collapsed');
+            } else {
+                content.classList.add('collapsed');
+                header.classList.add('collapsed');
+            }
+        }
+    }
+
+    clearSearch() {
+        const searchInput = document.querySelector('.branches-panel input[type="text"]');
+        if (searchInput) {
+            // Clear any pending search timeout
+            if (this.searchTimeout) {
+                clearTimeout(this.searchTimeout);
+                this.searchTimeout = null;
+            }
+            
+            searchInput.value = '';
+            this.searchTerm = '';
+            this.filterBranches();
+            searchInput.focus(); // Keep focus on the input for better UX
+            
+            // Hide the clear button
+            const clearButton = document.querySelector('.branches-panel .clear-search');
+            if (clearButton) {
+                clearButton.style.display = 'none';
+            }
+        }
+    }
+
+    clearCommitsSearch() {
+        const searchInput = document.querySelector('.commits-panel input[type="text"]');
+        if (searchInput) {
+            // Clear any pending search timeout
+            if (this.commitsSearchTimeout) {
+                clearTimeout(this.commitsSearchTimeout);
+                this.commitsSearchTimeout = null;
+            }
+            
+            searchInput.value = '';
+            this.commitsSearchTerm = '';
+            this.filterCommits();
+            searchInput.focus(); // Keep focus on the input for better UX
+            
+            // Hide the clear button
+            const clearButton = document.querySelector('.commits-panel .clear-search');
+            if (clearButton) {
+                clearButton.style.display = 'none';
+            }
+        }
+    }
+
+    filterByUser(user) {
+        this.selectedUser = user;
+        this.filterCommits();
+    }
+
+    // Public methods for global functions
+    selectBranch(branchName) {
+        console.log('selectBranch called with:', branchName);
+        this.currentBranch = branchName;
+        this.selectedCommits.clear();
+        
+        this.vscode.postMessage({ 
+            command: 'selectBranch',
+            branchName: branchName
+        });
+    }
+
+    selectCommit(hash, event = null) {
+        console.log('=== selectCommit called with:', hash, 'event:', event, '===');
+        console.log('Current selectedCommits before:', Array.from(this.selectedCommits));
+        
+        // Check if Ctrl/Cmd key is pressed for multi-select
+        const isMultiSelect = event && (event.ctrlKey || event.metaKey);
+        console.log('isMultiSelect:', isMultiSelect);
+        
+        if (isMultiSelect) {
+            // Multi-select mode: toggle the commit
+            if (this.selectedCommits.has(hash)) {
+                this.selectedCommits.delete(hash);
+                console.log('Removed commit from selection');
+            } else {
+                this.selectedCommits.add(hash);
+                console.log('Added commit to selection');
+            }
+        } else {
+            // Single select mode: clear others and select only this one
+            this.selectedCommits.clear();
+            this.selectedCommits.add(hash);
+            console.log('Single select mode: cleared others and selected only this one');
+        }
+        
+        console.log('Selected commits after:', Array.from(this.selectedCommits));
+        
+        // Update commit selection visual state
+        this.updateCommitSelection();
+        
+        // If only one commit is selected, show its file changes
+        if (this.selectedCommits.size === 1) {
+            const selectedHash = Array.from(this.selectedCommits)[0];
+            console.log('Single commit selected, calling showCommitFileChanges for:', selectedHash);
+            this.showCommitFileChanges(selectedHash);
+        } else if (this.selectedCommits.size > 1) {
+            // Show combined file changes for multiple commits
+            console.log('Multiple commits selected, calling showMultiCommitFileChanges for:', Array.from(this.selectedCommits));
+            this.showMultiCommitFileChanges(Array.from(this.selectedCommits));
+        } else {
+            // Clear file changes panel
+            console.log('No commits selected, clearing file changes panel');
+            this.clearFileChangesPanel();
+        }
+        console.log('=== selectCommit completed ===');
+    }
+
+    updateCommitSelection() {
+        // Update visual selection state for commit items
+        const commitItems = document.querySelectorAll('.commit-item');
+        commitItems.forEach(item => {
+            const hash = item.getAttribute('onclick')?.match(/selectCommit\('([^']+)'\)/)?.[1];
+            if (hash && this.selectedCommits.has(hash)) {
+                item.classList.add('selected');
+            } else {
+                item.classList.remove('selected');
+            }
+        });
+    }
+
+    showCommitFileChanges(hash) {
+        console.log('Showing file changes for commit:', hash);
+        this.vscode.postMessage({
+            command: 'getCommitDetails',
+            hash: hash
+        });
+    }
+
+    showMultiCommitFileChanges(hashes) {
+        console.log('Showing file changes for multiple commits:', hashes);
+        this.vscode.postMessage({
+            command: 'getMultiCommitFiles',
+            hashes: hashes
+        });
+    }
+
+    clearFileChangesPanel() {
+        const filesContent = document.getElementById('filesContent');
+        if (filesContent) {
+            filesContent.innerHTML = `
+                <div class="empty-state">
+                    <h3>No selection</h3>
+                    <p>Select a commit to view file changes</p>
+                </div>
+            `;
+        }
+    }
+
+    updateFileChangesPanel(commit, files) {
+        const filesContent = document.getElementById('filesContent');
+        if (!filesContent) return;
+
+        if (!files || files.length === 0) {
+            filesContent.innerHTML = `
+                <div class="empty-state">
+                    <h3>No file changes</h3>
+                    <p>This commit has no file changes</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Generate file changes tree
+        const fileTreeHtml = this.generateFileTreeHtml(files);
+        
+        // Generate commit details
+        const commitDetailsHtml = this.generateCommitDetailsHtml(commit);
+
+        filesContent.innerHTML = `
+            <div class="file-changes-container">
+                <div class="file-changes-tree">
+                    ${fileTreeHtml}
+                </div>
+                <div class="commit-details">
+                    ${commitDetailsHtml}
+                </div>
+            </div>
+        `;
+    }
+
+    generateFileTreeHtml(files) {
+        // Create a proper tree structure
+        const tree = {};
+        
+        files.forEach((file) => {
+            const parts = file.file.split('/');
+            let current = tree;
+            
+            // Navigate/create directory structure
+            for (let i = 0; i < parts.length - 1; i++) {
+                const part = parts[i];
+                if (!current[part]) {
+                    current[part] = { type: 'directory', children: {} };
+                }
+                current = current[part].children;
+            }
+            
+            // Add the file
+            const fileName = parts[parts.length - 1];
+            current[fileName] = { type: 'file', ...file };
+        });
+
+        return this.generateFileTreeItemsHtml(tree, 0);
+    }
+
+    generateFileTreeItemsHtml(tree, depth) {
+        let html = '';
+        const entries = Object.entries(tree).filter(([key, value]) => value !== undefined);
+        
+        // Sort entries: directories first, then files, both alphabetically
+        const sortedEntries = entries.sort(([a, b], [aItem, bItem]) => {
+            const aIsDir = aItem.type === 'directory';
+            const bIsDir = bItem.type === 'directory';
+            
+            if (aIsDir && !bIsDir) return -1;
+            if (!aIsDir && bIsDir) return 1;
+            return a.localeCompare(b);
+        });
+
+        sortedEntries.forEach(([name, item]) => {
+            if (item.type === 'directory') {
+                const hasChildren = Object.keys(item.children).length > 0;
+                const toggleClass = hasChildren ? 'tree-toggle' : 'tree-toggle-empty';
+                const toggleIcon = hasChildren ? '▼' : '';
+                
+                html += `
+                    <div class="file-tree-item directory" style="margin-left: ${depth * 4}px">
+                        <div class="file-tree-header" onclick="toggleFileTreeItem(this)">
+                            <span class="${toggleClass}">${toggleIcon}</span>
+                            <span class="file-icon">📁</span>
+                            <span class="file-name">${name}</span>
+                        </div>
+                        <div class="file-tree-children">
+                            ${this.generateFileTreeItemsHtml(item.children, depth + 1)}
+                        </div>
+                    </div>
+                `;
+            } else {
+                // This is a file
+                const statusIcon = this.getFileStatusIcon(item.status);
+                const changeStats = this.getFileChangeStats(item);
+                
+                html += `
+                    <div class="file-tree-item file" style="margin-left: ${depth * 8}px" onclick="showFileDiff('${item.file}')">
+                        <span class="file-icon">${statusIcon}</span>
+                        <span class="file-name">${name}</span>
+                        <span class="file-stats">${changeStats}</span>
+                    </div>
+                `;
+            }
+        });
+
+        return html;
+    }
+
+    getFileStatusIcon(status) {
+        switch (status) {
+            case 'A': return '🆕';
+            case 'D': return '🗑️';
+            case 'M': return '📝';
+            case 'R': return '🔄';
+            case 'C': return '📋';
+            case 'U': return '❓';
+            default: return '📄';
+        }
+    }
+
+    getFileChangeStats(file) {
+        if (file.additions > 0 && file.deletions > 0) {
+            return `+${file.additions} -${file.deletions}`;
+        } else if (file.additions > 0) {
+            return `+${file.additions}`;
+        } else if (file.deletions > 0) {
+            return `-${file.deletions}`;
+        }
+        return '';
+    }
+
+    generateCommitDetailsHtml(commit) {
+        if (!commit) return '';
+
+        const date = new Date(commit.date);
+        const formattedDate = date.toLocaleDateString();
+        const formattedTime = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        return `
+            <div class="commit-details-header">
+                <h3>Commit Details</h3>
+            </div>
+            <div class="commit-details-content">
+                <div class="commit-detail-item">
+                    <span class="commit-detail-label">Hash:</span>
+                    <span class="commit-detail-value">${commit.shortHash}</span>
+                </div>
+                <div class="commit-detail-item">
+                    <span class="commit-detail-label">Author:</span>
+                    <span class="commit-detail-value">${commit.author}</span>
+                </div>
+                <div class="commit-detail-item">
+                    <span class="commit-detail-label">Date:</span>
+                    <span class="commit-detail-value">${formattedDate} ${formattedTime}</span>
+                </div>
+                <div class="commit-detail-item">
+                    <span class="commit-detail-label">Message:</span>
+                    <span class="commit-detail-value">${commit.message}</span>
+                </div>
+                ${commit.refs && commit.refs.length > 0 ? `
+                    <div class="commit-detail-item">
+                        <span class="commit-detail-label">Refs:</span>
+                        <span class="commit-detail-value">${commit.refs.join(', ')}</span>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    refreshData() {
+        console.log('refreshData called');
+        this.vscode.postMessage({ command: 'refresh' });
+    }
+
+    showSquashDialog() {
+        const commitHashes = Array.from(this.selectedCommits);
+        const selectedCommitsList = this.commits.filter(c => this.selectedCommits.has(c.hash));
+        
+        const defaultMessage = selectedCommitsList.map(c => c.message).join('\n');
+        
+        const message = prompt('Enter commit message for squashed commit:', defaultMessage);
+        if (message) {
+            this.vscode.postMessage({
+                command: 'squashCommits',
+                commitHashes: commitHashes,
+                message: message
+            });
+        }
+    }
+}
+
+// Global functions for HTML onclick handlers
+let panelController;
+
+function selectBranch(branchName) {
+    panelController.selectBranch(branchName);
+}
+
+function selectCommit(hash, event) {
+    panelController.selectCommit(hash, event);
+}
+
+function refreshData() {
+    panelController.refreshData();
+}
+
+function showSquashDialog() {
+    panelController.showSquashDialog();
+}
+
+function toggleSection(sectionId) {
+    panelController.toggleSection(sectionId);
+}
+
+function clearSearch() {
+    panelController.clearSearch();
+}
+
+function clearCommitsSearch() {
+    panelController.clearCommitsSearch();
+}
+
+function filterByUser(user) {
+    panelController.filterByUser(user);
+}
+
+function toggleFileTreeItem(element) {
+    const children = element.parentElement.querySelector('.file-tree-children');
+    const toggle = element.querySelector('.tree-toggle');
+    
+    if (children && toggle) {
+        const isCollapsed = children.style.display === 'none';
+        children.style.display = isCollapsed ? 'block' : 'none';
+        toggle.textContent = isCollapsed ? '▼' : '▶';
+    }
+}
+
+function showFileDiff(filePath) {
+    console.log('Show file diff for:', filePath);
+    // This could be expanded to show actual file diff
+    // For now, just log the file path
+    panelController.vscode.postMessage({
+        command: 'showFileDiff',
+        filePath: filePath
+    });
+}
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    panelController = new PanelController();
+});
