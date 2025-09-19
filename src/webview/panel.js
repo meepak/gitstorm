@@ -907,10 +907,10 @@ class PanelController {
                             <span class="file-icon">${statusIcon}</span>
                             <span class="file-name">${name}</span>
                             <span class="file-stats">${changeStats}</span>
-                        </div>
-                        <div class="file-actions">
-                            <span class="action-icon" title="Open editable diff" onclick="event.stopPropagation(); showEditableDiff('${item.file}', '${fileId}')">✏️</span>
-                            <span class="action-icon" title="Open working file" onclick="event.stopPropagation(); openWorkingFile('${item.file}')">📄</span>
+                            <div class="file-actions">
+                                <span class="action-icon" title="Open editable diff" onclick="event.stopPropagation(); showEditableDiff('${item.file}', '${fileId}')">✏️</span>
+                                <span class="action-icon" title="Open working file" onclick="event.stopPropagation(); openWorkingFile('${item.file}')">📄</span>
+                            </div>
                         </div>
                     </div>
                 `;

@@ -585,9 +585,7 @@ input[type="text"]:focus {
 }
 
 .file-tree-item.file {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    display: block;
     padding: 2px 8px;
     border-radius: 2px;
     margin: 1px 0;
@@ -606,8 +604,8 @@ input[type="text"]:focus {
 .file-content {
     display: flex;
     align-items: center;
-    flex: 1;
     cursor: pointer;
+    width: 100%;
 }
 
 .file-actions {
@@ -678,7 +676,6 @@ input[type="text"]:focus {
 }
 
 .file-name {
-    flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
