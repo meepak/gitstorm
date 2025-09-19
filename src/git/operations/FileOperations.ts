@@ -44,7 +44,10 @@ export class FileOperations {
 
     async getMultiCommitFiles(commitHashes: string[]): Promise<FileChange[]> {
         try {
-            if (commitHashes.length === 0) return [];
+            if (!commitHashes || !Array.isArray(commitHashes) || commitHashes.length === 0) {
+                console.warn('getMultiCommitFiles: Invalid or empty commitHashes array:', commitHashes);
+                return [];
+            }
             if (commitHashes.length === 1) {
                 // Use the commit details method to get files for single commit
                 const log = await this.git.log({
@@ -118,8 +121,21 @@ export class FileOperations {
 
     async getMultiCommitFilesWithCompare(hashes: string[], compareBranch: string): Promise<FileChange[]> {
         try {
-            const files = await this.getFileChangesWithCompare(hashes.join('..'), compareBranch);
-            return files || [];
+            if (!hashes || !Array.isArray(hashes) || hashes.length === 0) {
+                console.warn('getMultiCommitFilesWithCompare: Invalid or empty hashes array:', hashes);
+                return [];
+            }
+            
+            if (hashes.length === 1) {
+                // For single commit, use the existing method
+                return await this.getFileChangesWithCompare(hashes[0], compareBranch);
+            }
+
+            // For multiple commits, create a range from parent of first commit to last commit
+            const firstCommit = hashes[0];
+            const lastCommit = hashes[hashes.length - 1];
+            const diff = await this.git.diff([`${compareBranch}..${lastCommit}`, '--numstat']);
+            return GitParsers.parseFileChanges(diff);
         } catch (error) {
             console.error('Error getting multi-commit files with compare:', error);
             return [];
@@ -128,8 +144,20 @@ export class FileOperations {
 
     async getMultiCommitFilesWithWorking(hashes: string[]): Promise<FileChange[]> {
         try {
-            const files = await this.getFileChangesWithWorking(hashes.join('..'));
-            return files || [];
+            if (!hashes || !Array.isArray(hashes) || hashes.length === 0) {
+                console.warn('getMultiCommitFilesWithWorking: Invalid or empty hashes array:', hashes);
+                return [];
+            }
+            
+            if (hashes.length === 1) {
+                // For single commit, use the existing method
+                return await this.getFileChangesWithWorking(hashes[0]);
+            }
+
+            // For multiple commits, create a range from parent of first commit to HEAD
+            const firstCommit = hashes[0];
+            const diff = await this.git.diff([`${firstCommit}~1..HEAD`, '--numstat']);
+            return GitParsers.parseFileChanges(diff);
         } catch (error) {
             console.error('Error getting multi-commit files with working:', error);
             return [];

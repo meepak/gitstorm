@@ -324,7 +324,7 @@ class PanelController {
         console.log('Showing file changes for multiple commits:', hashes);
         this.vscode.postMessage({
             command: 'getMultiCommitFiles',
-            hashes: hashes,
+            commitHashes: hashes,
             compareAgainst: this.compareAgainst,
             compareBranch: this.selectedCompareBranch
         });
