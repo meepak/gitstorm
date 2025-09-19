@@ -38,6 +38,9 @@ class PanelController {
         this.setupMutationObserver();
         this.contextMenuHandler.setupContextMenu();
         
+        // Initialize compare dropdown state
+        this.initializeCompareDropdownState();
+        
         // Setup search manager after a short delay to ensure DOM is ready
         setTimeout(() => {
             this.searchManager.setupSearchEventListeners();
@@ -159,9 +162,10 @@ class PanelController {
         // Store branches for search filtering
         if (branches && branches.length > 0) {
             this.branches = branches;
-            // Find and log the current branch
-            const currentBranch = branches.find(b => b.isCurrent);
-            console.log('Current branch found:', currentBranch);
+            // Find and log the current branch (the one you're actually on)
+            const actualCurrentBranch = branches.find(b => b.isCurrent);
+            console.log('Actual current branch (where you are):', actualCurrentBranch);
+            console.log('Selected branch (what you\'re viewing):', this.currentBranch);
         }
 
         // Store uncommitted changes state
@@ -169,6 +173,11 @@ class PanelController {
         
         // Delegate to UI renderer
         this.uiRenderer.updateContent(branches, commits, error, hasUncommittedChanges);
+        
+        // Ensure compare dropdown state is restored after content update
+        setTimeout(() => {
+            this.restoreCompareDropdownState();
+        }, 100);
     }
 
     // Public methods that other components can call
@@ -207,7 +216,11 @@ class PanelController {
         
         // Check if there's a compare option selected
         if (this.commitsCompareAgainst && this.commitsCompareAgainst !== 'none') {
-            console.log('Branch selection with compare option:', this.commitsCompareAgainst);
+            console.log('Branch selection with compare option:', {
+                selectedBranch: branchName,
+                compareBranch: this.commitsCompareAgainst,
+                willShow: `commits in ${branchName} but not in ${this.commitsCompareAgainst}`
+            });
             // Use compare functionality
             this.vscode.postMessage({
                 command: 'getCommitsWithCompare',
@@ -215,13 +228,16 @@ class PanelController {
                 compareBranch: this.commitsCompareAgainst
             });
         } else {
-            console.log('Branch selection without compare option');
+            console.log('Branch selection without compare option - showing all commits in:', branchName);
             // Regular branch selection
             this.vscode.postMessage({
                 command: 'selectBranch',
                 branchName: branchName
             });
         }
+        
+        // Ensure compare dropdown state is properly restored
+        this.restoreCompareDropdownState();
     }
 
     selectCommit(commitHash, isMultiSelect = false) {
@@ -387,6 +403,24 @@ class PanelController {
         const diffContent = document.getElementById('diffContent');
         if (diffContent) {
             diffContent.innerHTML = '<div class="empty-state"><h3>No diff selected</h3><p>Click on a file to view its changes</p></div>';
+        }
+    }
+
+    restoreCompareDropdownState() {
+        // Restore the compare dropdown state from localStorage
+        const compareSelect = document.getElementById('commitsCompareFilter');
+        if (compareSelect && this.commitsCompareAgainst) {
+            compareSelect.value = this.commitsCompareAgainst;
+            console.log('Restored compare dropdown state:', this.commitsCompareAgainst);
+        }
+    }
+
+    // Initialize compare dropdown state from localStorage
+    initializeCompareDropdownState() {
+        const savedCompareState = localStorage.getItem('gitstorm-commits-compare-against');
+        if (savedCompareState) {
+            this.commitsCompareAgainst = savedCompareState;
+            console.log('Initialized compare dropdown state from localStorage:', this.commitsCompareAgainst);
         }
     }
 }

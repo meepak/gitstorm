@@ -70,14 +70,38 @@ class SearchManager {
         console.log('Filtering commits with search term:', this.panel.commitsSearchTerm, 'and user:', this.panel.selectedUser);
         const commitsContent = document.getElementById('commitsContent');
         if (commitsContent) {
-            const newHtml = this.panel.uiRenderer.generateCommitsHtml(this.panel.commits, this.panel.commitsSearchTerm, this.panel.selectedUser);
+            // Apply filters to the current commits
+            const filteredCommits = this.filterCommitsByCriteria(this.panel.commits, this.panel.commitsSearchTerm, this.panel.selectedUser);
+            const newHtml = this.panel.uiRenderer.generateCommitsHtml(filteredCommits, this.panel.commitsSearchTerm, this.panel.selectedUser);
             commitsContent.innerHTML = newHtml;
             // Restore commit selection after content update
             setTimeout(() => this.panel.updateCommitSelection(), 10);
-            console.log('Updated commits content');
+            console.log('Updated commits content with', filteredCommits.length, 'filtered commits');
         } else {
             console.log('commitsContent element not found');
         }
+    }
+    
+    filterCommitsByCriteria(commits, searchTerm, selectedUser) {
+        if (!commits) return [];
+        
+        let filtered = commits;
+        
+        // Filter by search term
+        if (searchTerm && searchTerm.length > 0) {
+            filtered = filtered.filter(commit => 
+                commit.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                commit.author.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                commit.hash.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+        
+        // Filter by author
+        if (selectedUser && selectedUser !== 'all') {
+            filtered = filtered.filter(commit => commit.author === selectedUser);
+        }
+        
+        return filtered;
     }
 
     handleCommitsCompareChange(branchName) {
@@ -108,12 +132,23 @@ class SearchManager {
                     branch: this.panel.currentBranch,
                     compareBranch: branchName
                 });
+                
+                // Clear current commits display while loading
+                const commitsContent = document.getElementById('commitsContent');
+                if (commitsContent) {
+                    commitsContent.innerHTML = '<div class="loading">Loading compared commits...</div>';
+                }
+                
                 this.panel.messageHandler.sendMessage('getCommitsWithCompare', {
                     branch: this.panel.currentBranch,
                     compareBranch: branchName
                 });
             } else {
                 console.log('No current branch selected for compare');
+                const commitsContent = document.getElementById('commitsContent');
+                if (commitsContent) {
+                    commitsContent.innerHTML = '<div class="empty-state"><h3>No branch selected</h3><p>Please select a branch first</p></div>';
+                }
             }
         }
     }

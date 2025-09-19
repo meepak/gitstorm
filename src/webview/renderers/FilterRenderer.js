@@ -56,22 +56,24 @@ class FilterRenderer {
         labelOption.style.color = '#666';
         compareSelect.appendChild(labelOption);
         
-        // Add branch options (only local branches)
+        // Add branch options (both local and remote branches)
         this.panel.branches.forEach(branch => {
-            if (!branch.isRemote) {
-                const option = document.createElement('option');
-                option.value = branch.name;
-                option.textContent = branch.name;
-                compareSelect.appendChild(option);
-            }
+            const option = document.createElement('option');
+            option.value = branch.name;
+            // For remote branches, show only the branch name without origin
+            const displayName = branch.isRemote ? branch.name.split('/').slice(1).join('/') : branch.name;
+            option.textContent = displayName;
+            compareSelect.appendChild(option);
         });
         
         // Restore selection if it still exists
         if (currentSelection && compareSelect.querySelector(`option[value="${currentSelection}"]`)) {
             compareSelect.value = currentSelection;
         } else {
-            // Default to "Show all commits"
+            // Use the panel's stored compare state
             compareSelect.value = this.panel.commitsCompareAgainst || 'none';
         }
+        
+        console.log('Populated compare filter with selection:', compareSelect.value);
     }
 }

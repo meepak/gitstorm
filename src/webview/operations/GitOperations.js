@@ -2,6 +2,15 @@
 class GitOperations {
     constructor(panelController) {
         this.panel = panelController;
+        this.confirmationDialog = null; // Initialize lazily
+    }
+
+    // Lazy initialization of confirmation dialog
+    getConfirmationDialog() {
+        if (!this.confirmationDialog && typeof ConfirmationDialog !== 'undefined') {
+            this.confirmationDialog = new ConfirmationDialog();
+        }
+        return this.confirmationDialog;
     }
 
     // File operations
@@ -130,8 +139,23 @@ class GitOperations {
 
     deleteBranch(branchName) {
         console.log('Deleting branch:', branchName);
-        if (confirm(`Are you sure you want to delete branch "${branchName}"?`)) {
-            this.panel.messageHandler.sendMessage('deleteBranch', { branchName });
+        const dialog = this.getConfirmationDialog();
+        if (dialog) {
+            dialog.show(
+                `Are you sure you want to delete branch "${branchName}"?`,
+                'Delete Branch',
+                {
+                    confirmText: 'Delete',
+                    confirmButtonClass: 'danger-btn'
+                },
+                (confirmed) => {
+                    if (confirmed) {
+                        this.panel.messageHandler.sendMessage('deleteBranch', { branchName });
+                    }
+                }
+            );
+        } else {
+            console.error('ConfirmationDialog not available');
         }
     }
 
@@ -154,8 +178,23 @@ class GitOperations {
 
     revertCommit(commitHash) {
         console.log('Reverting commit:', commitHash);
-        if (confirm('Are you sure you want to revert this commit?')) {
-            this.panel.messageHandler.sendMessage('revertCommit', { commitHash });
+        const dialog = this.getConfirmationDialog();
+        if (dialog) {
+            dialog.show(
+                'Are you sure you want to revert this commit?',
+                'Revert Commit',
+                {
+                    confirmText: 'Revert',
+                    confirmButtonClass: 'danger-btn'
+                },
+                (confirmed) => {
+                    if (confirmed) {
+                        this.panel.messageHandler.sendMessage('revertCommit', { commitHash });
+                    }
+                }
+            );
+        } else {
+            console.error('ConfirmationDialog not available');
         }
     }
 

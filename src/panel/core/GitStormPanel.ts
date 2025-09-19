@@ -77,6 +77,7 @@ export class GitStormPanel {
 
         // Send initial data after a short delay to ensure webview is ready
         setTimeout(async () => {
+            console.log('Sending initial data to webview...');
             await this._sendInitialData();
         }, 100);
     }

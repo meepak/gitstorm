@@ -7,6 +7,8 @@ export class CommitOperations {
 
     async getCommits(branch?: string, limit: number = 100): Promise<Commit[]> {
         try {
+            console.log(`Getting commits for branch: ${branch || 'HEAD'}`);
+            
             const options: any = {
                 maxCount: limit,
                 format: {
@@ -19,12 +21,19 @@ export class CommitOperations {
                 }
             };
 
+            // Use the correct syntax for simple-git
+            let log;
             if (branch) {
-                options.from = branch;
+                // For specific branches, use the branch name directly
+                log = await this.git.log([branch], options);
+            } else {
+                // For current branch, use default
+                log = await this.git.log(options);
             }
 
-            const log = await this.git.log(options);
             const commits: Commit[] = [];
+
+            console.log(`Found ${log.all.length} commits for branch: ${branch || 'HEAD'}`);
 
             for (const commit of log.all) {
                 commits.push({
@@ -47,6 +56,27 @@ export class CommitOperations {
 
     async getCommitsExcludingBranch(branch: string, excludeBranch: string, limit: number = 100): Promise<Commit[]> {
         try {
+            console.log(`Getting commits in ${branch} but not in ${excludeBranch}`);
+            
+            // First, validate that both branches exist
+            const branches = await this.git.branch();
+            const allBranches = branches.all;
+            
+            if (!allBranches.includes(branch)) {
+                console.error(`Branch ${branch} does not exist`);
+                return [];
+            }
+            
+            if (!allBranches.includes(excludeBranch)) {
+                console.error(`Exclude branch ${excludeBranch} does not exist`);
+                return [];
+            }
+
+            // Use the correct Git range syntax: excludeBranch..branch
+            // This shows commits in 'branch' but not in 'excludeBranch'
+            const range = `${excludeBranch}..${branch}`;
+            console.log(`Using Git range: ${range}`);
+            
             const options: any = {
                 maxCount: limit,
                 format: {
@@ -56,13 +86,14 @@ export class CommitOperations {
                     message: '%s',
                     parent: '%P',
                     refs: '%D'
-                },
-                from: branch,
-                to: excludeBranch
+                }
             };
 
-            const log = await this.git.log(options);
+            // Use the range syntax directly
+            const log = await this.git.log([range], options);
             const commits: Commit[] = [];
+
+            console.log(`Found ${log.all.length} commits in range ${range}`);
 
             for (const commit of log.all) {
                 commits.push({

@@ -99,6 +99,12 @@ class UIRenderer {
                 commitsContent.innerHTML = '<div class="loading">Loading commits...</div>';
             }
         }
+        
+        // Always populate compare filter when branches are available
+        if (branches && branches.length > 0) {
+            this.panel.branches = branches;
+            this.populateCommitsCompareFilter();
+        }
     }
 
     // Delegate methods to specialized renderers

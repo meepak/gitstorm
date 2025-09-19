@@ -96,8 +96,6 @@ class MessageHandler {
         if (filesContent) {
             // Always use the layout method to ensure header and footer are shown
             const layoutHtml = this.panel.uiRenderer.generateFileChangesLayout(commit, files);
-            console.log('Generated layout HTML length:', layoutHtml.length);
-            console.log('Generated layout HTML preview:', layoutHtml.substring(0, 200));
             filesContent.innerHTML = layoutHtml;
             console.log('Files content updated successfully');
         } else {
@@ -159,14 +157,45 @@ class MessageHandler {
     }
 
     handleCommitsWithCompare(commits) {
+        console.log('handleCommitsWithCompare called with:', commits?.length, 'commits');
         if (commits) {
             this.panel.commits = commits;
             const commitsContent = document.getElementById('commitsContent');
             if (commitsContent) {
-                commitsContent.innerHTML = this.panel.uiRenderer.generateCommitsHtml(commits, this.panel.commitsSearchTerm, this.panel.selectedUser);
+                // Apply current filters to the compared commits
+                const filteredCommits = this.filterCommits(commits, this.panel.commitsSearchTerm, this.panel.selectedUser);
+                commitsContent.innerHTML = this.panel.uiRenderer.generateCommitsHtml(filteredCommits, this.panel.commitsSearchTerm, this.panel.selectedUser);
                 setTimeout(() => this.panel.updateCommitSelection(), 10);
             }
+        } else {
+            console.log('No commits received for comparison');
+            const commitsContent = document.getElementById('commitsContent');
+            if (commitsContent) {
+                commitsContent.innerHTML = '<div class="empty-state"><h3>No commits found</h3><p>No commits in this branch that are not in the comparison branch</p></div>';
+            }
         }
+    }
+    
+    filterCommits(commits, searchTerm, selectedUser) {
+        if (!commits) return [];
+        
+        let filtered = commits;
+        
+        // Filter by search term
+        if (searchTerm && searchTerm.length > 0) {
+            filtered = filtered.filter(commit => 
+                commit.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                commit.author.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                commit.hash.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+        
+        // Filter by author
+        if (selectedUser && selectedUser !== 'all') {
+            filtered = filtered.filter(commit => commit.author === selectedUser);
+        }
+        
+        return filtered;
     }
 
     handleUpdateCommitsWithCompare(commits, branch, compareBranch, error) {
