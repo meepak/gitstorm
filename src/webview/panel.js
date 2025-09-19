@@ -25,6 +25,7 @@ class PanelController {
         this.setupEventListeners();
         this.setupResizeHandlers();
         this.setupMutationObserver();
+        this.setupContextMenu();
         
         // Send a test message to the extension
         this.vscode.postMessage({ command: 'test', data: 'WebView is ready' });
@@ -155,6 +156,334 @@ class PanelController {
         });
     }
 
+    setupContextMenu() {
+        this.contextMenu = document.getElementById('contextMenu');
+        this.contextMenuData = null;
+        
+        // Hide context menu when clicking elsewhere
+        document.addEventListener('click', () => {
+            this.hideContextMenu();
+        });
+        
+        // Hide context menu on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.hideContextMenu();
+            }
+        });
+        
+        // Handle context menu item clicks
+        this.contextMenu.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const action = e.target.closest('.context-menu-item')?.dataset.action;
+            if (action) {
+                this.handleContextMenuAction(action);
+            }
+        });
+
+        // Handle text selection context menu
+        document.addEventListener('mouseup', (e) => {
+            const selection = window.getSelection();
+            if (selection && selection.toString().trim().length > 0) {
+                // Show context menu for text selection
+                setTimeout(() => {
+                    this.showContextMenu(e.clientX, e.clientY, 'text', { text: selection.toString() });
+                }, 100);
+            }
+        });
+
+        // Handle right-click on general areas
+        document.addEventListener('contextmenu', (e) => {
+            // Only show default context menu if no specific element handled it
+            if (!e.target.closest('[oncontextmenu]')) {
+                e.preventDefault();
+                this.showContextMenu(e.clientX, e.clientY, 'default', {});
+            }
+        });
+    }
+
+    showContextMenu(x, y, type, data) {
+        this.contextMenuData = { type, data };
+        
+        // Reset all menu items visibility
+        const items = this.contextMenu.querySelectorAll('.context-menu-item');
+        items.forEach(item => {
+            item.style.display = 'none';
+        });
+        
+        // Show relevant items based on type
+        switch (type) {
+            case 'branch':
+                this.showBranchContextMenu();
+                break;
+            case 'commit':
+                this.showCommitContextMenu();
+                break;
+            case 'file':
+                this.showFileContextMenu();
+                break;
+            case 'directory':
+                this.showDirectoryContextMenu();
+                break;
+            case 'panel':
+                this.showPanelContextMenu();
+                break;
+            case 'text':
+                this.showTextContextMenu();
+                break;
+            default:
+                this.showDefaultContextMenu();
+        }
+        
+        // Position the context menu
+        this.contextMenu.style.left = x + 'px';
+        this.contextMenu.style.top = y + 'px';
+        this.contextMenu.style.display = 'block';
+        
+        // Adjust position if menu goes off screen
+        const rect = this.contextMenu.getBoundingClientRect();
+        if (rect.right > window.innerWidth) {
+            this.contextMenu.style.left = (x - rect.width) + 'px';
+        }
+        if (rect.bottom > window.innerHeight) {
+            this.contextMenu.style.top = (y - rect.height) + 'px';
+        }
+    }
+
+    hideContextMenu() {
+        this.contextMenu.style.display = 'none';
+        this.contextMenuData = null;
+    }
+
+    showBranchContextMenu() {
+        // Show branch-specific actions
+        this.contextMenu.querySelector('[data-action="checkout"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="merge"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="delete-branch"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="refresh"]').style.display = 'flex';
+    }
+
+    showCommitContextMenu() {
+        // Show commit-specific actions
+        this.contextMenu.querySelector('[data-action="create-branch"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="cherry-pick"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="revert"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="diff"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="refresh"]').style.display = 'flex';
+        
+        // Show squash option only if multiple commits are selected
+        if (this.selectedCommits && this.selectedCommits.size > 1) {
+            this.contextMenu.querySelector('[data-action="squash"]').style.display = 'flex';
+        }
+    }
+
+    showFileContextMenu() {
+        // Show file-specific actions
+        this.contextMenu.querySelector('[data-action="open"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="diff"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="copy-path"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="reveal"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="refresh"]').style.display = 'flex';
+    }
+
+    showDirectoryContextMenu() {
+        // Show directory-specific actions
+        this.contextMenu.querySelector('[data-action="copy-path"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="reveal"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="refresh"]').style.display = 'flex';
+    }
+
+    showPanelContextMenu() {
+        // Show panel-specific actions
+        this.contextMenu.querySelector('[data-action="refresh"]').style.display = 'flex';
+    }
+
+    showTextContextMenu() {
+        // Show text-specific actions
+        this.contextMenu.querySelector('[data-action="copy"]').style.display = 'flex';
+    }
+
+    showDefaultContextMenu() {
+        // Show default actions
+        this.contextMenu.querySelector('[data-action="refresh"]').style.display = 'flex';
+    }
+
+    handleContextMenuAction(action) {
+        if (!this.contextMenuData) return;
+        
+        const { type, data } = this.contextMenuData;
+        
+        switch (action) {
+            case 'copy':
+                this.copyToClipboard(data.text || data.branchName || data.commitHash || data.filePath || '');
+                break;
+            case 'open':
+                if (type === 'file') {
+                    this.openFile(data.filePath);
+                }
+                break;
+            case 'diff':
+                if (type === 'file') {
+                    this.showFileDiff(data.filePath, data.fileId);
+                } else if (type === 'commit') {
+                    this.showCommitDiff(data.commitHash);
+                }
+                break;
+            case 'copy-path':
+                if (type === 'file') {
+                    this.copyToClipboard(data.filePath);
+                } else if (type === 'directory') {
+                    this.copyToClipboard(data.directoryName);
+                }
+                break;
+            case 'reveal':
+                if (type === 'file') {
+                    this.revealFileInExplorer(data.filePath);
+                } else if (type === 'directory') {
+                    this.revealDirectoryInExplorer(data.directoryName);
+                }
+                break;
+            case 'checkout':
+                if (type === 'branch') {
+                    this.checkoutBranch(data.branchName);
+                }
+                break;
+            case 'merge':
+                if (type === 'branch') {
+                    this.mergeBranch(data.branchName);
+                }
+                break;
+            case 'delete-branch':
+                if (type === 'branch') {
+                    this.deleteBranch(data.branchName);
+                }
+                break;
+            case 'create-branch':
+                if (type === 'commit') {
+                    this.createBranchFromCommit(data.commitHash);
+                }
+                break;
+            case 'cherry-pick':
+                if (type === 'commit') {
+                    this.cherryPickCommit(data.commitHash);
+                }
+                break;
+            case 'revert':
+                if (type === 'commit') {
+                    this.revertCommit(data.commitHash);
+                }
+                break;
+            case 'squash':
+                if (type === 'commit') {
+                    this.squashCommits();
+                }
+                break;
+            case 'refresh':
+                this.refreshData();
+                break;
+        }
+        
+        this.hideContextMenu();
+    }
+
+    copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            console.log('Copied to clipboard:', text);
+        }).catch(err => {
+            console.error('Failed to copy to clipboard:', err);
+        });
+    }
+
+    openFile(filePath) {
+        this.vscode.postMessage({
+            command: 'openWorkingFile',
+            filePath: filePath
+        });
+    }
+
+    showFileDiff(filePath, fileId) {
+        if (fileId) {
+            showFileDiffWithCompare(filePath, fileId);
+        } else {
+            showFileDiff(filePath, this.getCurrentCommitHash());
+        }
+    }
+
+    showCommitDiff(commitHash) {
+        this.vscode.postMessage({
+            command: 'showCommitDiff',
+            commitHash: commitHash
+        });
+    }
+
+    revealFileInExplorer(filePath) {
+        this.vscode.postMessage({
+            command: 'revealFileInExplorer',
+            filePath: filePath
+        });
+    }
+
+    revealDirectoryInExplorer(directoryName) {
+        this.vscode.postMessage({
+            command: 'revealDirectoryInExplorer',
+            directoryName: directoryName
+        });
+    }
+
+    checkoutBranch(branchName) {
+        this.vscode.postMessage({
+            command: 'checkoutBranch',
+            branchName: branchName
+        });
+        // Refresh the data after checkout and select the newly checked out branch
+        setTimeout(() => {
+            this.refreshData();
+            // Select the newly checked out branch after refresh
+            setTimeout(() => {
+                this.selectBranch(branchName);
+            }, 500);
+        }, 1000);
+    }
+
+    mergeBranch(branchName) {
+        this.vscode.postMessage({
+            command: 'mergeBranch',
+            branchName: branchName
+        });
+    }
+
+    deleteBranch(branchName) {
+        this.vscode.postMessage({
+            command: 'deleteBranch',
+            branchName: branchName
+        });
+    }
+
+    createBranchFromCommit(commitHash) {
+        this.vscode.postMessage({
+            command: 'createBranchFromCommit',
+            commitHash: commitHash
+        });
+    }
+
+    cherryPickCommit(commitHash) {
+        this.vscode.postMessage({
+            command: 'cherryPickCommit',
+            commitHash: commitHash
+        });
+    }
+
+    revertCommit(commitHash) {
+        this.vscode.postMessage({
+            command: 'revertCommit',
+            commitHash: commitHash
+        });
+    }
+
+    squashCommits() {
+        this.showSquashDialog();
+    }
+
     updateContent(branches, commits, error) {
         console.log('Updating content:', { branches: branches?.length, commits: commits?.length, error });
         
@@ -276,9 +605,10 @@ class PanelController {
 
     generateBranchItemsHtml(branches, selectedBranch) {
         return branches.map(branch => {
-            const isSelected = (selectedBranch && branch.name === selectedBranch) || 
-                              (!selectedBranch && branch.isCurrent);
-            const highlightClass = isSelected ? 'current' : '';
+            const isSelected = (selectedBranch && branch.name === selectedBranch);
+            const isCurrent = branch.isCurrent;
+            const highlightClass = isSelected ? 'selected' : '';
+            const currentClass = isCurrent ? 'current' : '';
             const typeIcon = branch.isRemote ? '🌐' : '🌿';
             const refs = branch.ahead || branch.behind ? 
                 `+${branch.ahead || 0} -${branch.behind || 0}` : '';
@@ -287,7 +617,9 @@ class PanelController {
             const displayName = branch.isRemote ? branch.name.split('/').slice(1).join('/') : branch.name;
 
             return `
-                <div class="branch-item ${highlightClass}" onclick="selectBranch('${branch.name}')">
+                <div class="branch-item ${highlightClass} ${currentClass}" 
+                     onclick="selectBranch('${branch.name}')" 
+                     oncontextmenu="event.preventDefault(); showBranchContextMenu(event, '${branch.name}')">
                     <div class="branch-icon">${typeIcon}</div>
                     <div class="branch-name">${displayName}</div>
                     <div class="branch-refs">${refs}</div>
@@ -357,7 +689,11 @@ class PanelController {
             }
             
             return `
-                <div class="commit-item" onclick="selectCommit('${commit.hash}', event)" data-commit-hash="${commit.hash}" data-commit-index="${index}">
+                <div class="commit-item" 
+                     onclick="selectCommit('${commit.hash}', event)" 
+                     oncontextmenu="event.preventDefault(); showCommitContextMenu(event, '${commit.hash}')"
+                     data-commit-hash="${commit.hash}" 
+                     data-commit-index="${index}">
                     <div class="commit-graph">
                         <div class="dag-commit ${dagClass}"></div>
                     </div>
@@ -917,7 +1253,9 @@ class PanelController {
                 const toggleIcon = hasChildren ? '▼' : '';
                 
                 html += `
-                    <div class="file-tree-item directory" style="margin-left: ${depth * 4}px">
+                    <div class="file-tree-item directory" 
+                         style="margin-left: ${depth * 4}px"
+                         oncontextmenu="event.preventDefault(); showDirectoryContextMenu(event, '${name}')">
                         <div class="file-tree-header" onclick="toggleFileTreeItem(this)">
                             <span class="${toggleClass}">${toggleIcon}</span>
                             <span class="file-icon">📁</span>
@@ -941,7 +1279,10 @@ class PanelController {
                 const fileId = `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
                 
                 html += `
-                    <div class="file-tree-item file" style="margin-left: ${depth * 8}px" data-file-id="${fileId}">
+                    <div class="file-tree-item file" 
+                         style="margin-left: ${depth * 8}px" 
+                         data-file-id="${fileId}"
+                         oncontextmenu="event.preventDefault(); showFileContextMenu(event, '${item.file}', '${fileId}')">
                         <div class="file-content" onclick="showFileDiffWithCompare('${item.file}', '${fileId}')">
                             <span class="file-icon">${statusIcon}</span>
                             <span class="file-name">${name}</span>
@@ -1201,9 +1542,9 @@ class PanelController {
                 if (match) {
                     const itemBranchName = match[1];
                     if (itemBranchName === selectedBranch) {
-                        item.classList.add('current');
+                        item.classList.add('selected');
                     } else {
-                        item.classList.remove('current');
+                        item.classList.remove('selected');
                     }
                 }
             }
@@ -1336,6 +1677,56 @@ function openWorkingFile(filePath) {
         command: 'openWorkingFile',
         filePath: filePath
     });
+}
+
+// Context Menu Functions
+function showBranchContextMenu(event, branchName) {
+    event.preventDefault();
+    const rect = event.target.getBoundingClientRect();
+    
+    // Select the branch first
+    selectBranch(branchName);
+    
+    // Show custom context menu
+    panelController.showContextMenu(event.clientX, event.clientY, 'branch', { branchName });
+}
+
+function showCommitContextMenu(event, commitHash) {
+    event.preventDefault();
+    const rect = event.target.getBoundingClientRect();
+    
+    // Select the commit first
+    selectCommit(commitHash, event);
+    
+    // Show custom context menu
+    panelController.showContextMenu(event.clientX, event.clientY, 'commit', { commitHash });
+}
+
+function showFileContextMenu(event, filePath, fileId) {
+    event.preventDefault();
+    const rect = event.target.getBoundingClientRect();
+    
+    // Select the file first
+    panelController.updateFileSelection(fileId);
+    
+    // Show custom context menu
+    panelController.showContextMenu(event.clientX, event.clientY, 'file', { filePath, fileId });
+}
+
+function showDirectoryContextMenu(event, directoryName) {
+    event.preventDefault();
+    const rect = event.target.getBoundingClientRect();
+    
+    // Show custom context menu for directory
+    panelController.showContextMenu(event.clientX, event.clientY, 'directory', { directoryName });
+}
+
+function showPanelContextMenu(event, panelType) {
+    event.preventDefault();
+    const rect = event.target.getBoundingClientRect();
+    
+    // Show custom context menu for panel
+    panelController.showContextMenu(event.clientX, event.clientY, 'panel', { panelType });
 }
 
 // Initialize when DOM is ready

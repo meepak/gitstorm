@@ -39,9 +39,6 @@ body {
     background-color: var(--vscode-button-hoverBackground);
 }
 
-.squash-button {
-    display: none;
-}
 
 .main-content {
     display: flex;
@@ -160,11 +157,6 @@ body {
 
 .branch-item:hover {
     background-color: var(--vscode-list-hoverBackground);
-}
-
-.branch-item.current {
-    background-color: var(--vscode-list-activeSelectionBackground);
-    color: var(--vscode-list-activeSelectionForeground);
 }
 
 .branch-icon {
@@ -422,8 +414,7 @@ input[type="text"]:focus {
 }
 
 .user-filter {
-    min-width: 120px;
-    padding: 6px 8px;
+    padding: 4px 8px;
     border: 1px solid var(--vscode-input-border);
     background-color: var(--vscode-input-background);
     color: var(--vscode-input-foreground);
@@ -455,7 +446,7 @@ input[type="text"]:focus {
     color: var(--vscode-input-foreground);
     border-radius: 3px;
     font-size: 12px;
-    min-width: 120px;
+    max-width: 235px;
 }
 
 .commits-compare .compare-select:focus {
@@ -545,21 +536,23 @@ input[type="text"]:focus {
     background-color: var(--vscode-list-hoverBackground);
 }
 
-.branch-item.current {
+/* Selected branch styling (clicked/selected) - overrides current branch styling */
+.branch-item.selected {
     background-color: var(--vscode-list-activeSelectionBackground);
     color: var(--vscode-list-activeSelectionForeground);
 }
 
-.branch-item.current::before {
-    content: '';
-    position: absolute;
-    left: -9px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 3px;
-    height: 16px;
-    background-color: var(--vscode-focusBorder);
-    border-radius: 2px;
+.branch-item.selected .branch-name {
+    font-style: normal !important;
+    text-decoration: none !important;
+    color: var(--vscode-list-activeSelectionForeground) !important;
+}
+
+/* Current branch styling (checked out) - only when not selected */
+.branch-item.current .branch-name {
+    font-style: italic;
+    text-decoration: underline;
+    color: #007ACC; /* Blue color for current branch */
 }
 
 /* File Changes Panel Styles */
@@ -824,5 +817,111 @@ input[type="text"]:focus {
 
 .file-tree-item.file[data-status="R"] .file-name {
     color: var(--vscode-gitDecoration-renamedResourceForeground, #2196f3);
+}
+
+/* Context Menu Styles */
+.context-menu {
+    position: fixed;
+    background-color: var(--vscode-menu-background);
+    border: 1px solid var(--vscode-menu-border);
+    border-radius: 4px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    min-width: 160px;
+    padding: 4px 0;
+    font-size: 13px;
+}
+
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    cursor: pointer;
+    color: var(--vscode-menu-foreground);
+    transition: background-color 0.1s ease;
+}
+
+.context-menu-item:hover {
+    background-color: var(--vscode-menu-selectionBackground);
+    color: var(--vscode-menu-selectionForeground);
+}
+
+.context-menu-item:active {
+    background-color: var(--vscode-menu-selectionBackground);
+}
+
+.context-menu-icon {
+    margin-right: 8px;
+    width: 16px;
+    text-align: center;
+    font-size: 12px;
+}
+
+.context-menu-text {
+    flex: 1;
+}
+
+.context-menu-separator {
+    height: 1px;
+    background-color: var(--vscode-menu-separatorBackground);
+    margin: 4px 0;
+}
+
+/* Hide all context menu items by default */
+.context-menu-item {
+    display: none;
+}
+
+/* Show specific items based on context */
+.context-menu-item[data-action="copy"] {
+    display: none; /* Shown for text selections */
+}
+
+.context-menu-item[data-action="open"] {
+    display: none; /* Shown for files */
+}
+
+.context-menu-item[data-action="diff"] {
+    display: none; /* Shown for files and commits */
+}
+
+.context-menu-item[data-action="copy-path"] {
+    display: none; /* Shown for files */
+}
+
+.context-menu-item[data-action="reveal"] {
+    display: none; /* Shown for files */
+}
+
+.context-menu-item[data-action="checkout"] {
+    display: none; /* Shown for branches */
+}
+
+.context-menu-item[data-action="merge"] {
+    display: none; /* Shown for branches */
+}
+
+.context-menu-item[data-action="delete-branch"] {
+    display: none; /* Shown for branches */
+}
+
+.context-menu-item[data-action="create-branch"] {
+    display: none; /* Shown for commits */
+}
+
+.context-menu-item[data-action="cherry-pick"] {
+    display: none; /* Shown for commits */
+}
+
+.context-menu-item[data-action="revert"] {
+    display: none; /* Shown for commits */
+}
+
+.context-menu-item[data-action="squash"] {
+    display: none; /* Shown for commits when multiple selected */
+}
+
+.context-menu-item[data-action="refresh"] {
+    display: none; /* Shown for all contexts */
 }
 

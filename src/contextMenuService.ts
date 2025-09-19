@@ -362,4 +362,88 @@ Refs: ${commit.refs.join(', ')}`;
 
         await vscode.window.showTextDocument(doc);
     }
+
+    async showFileContextMenu(filePath: string, webview: vscode.Webview): Promise<void> {
+        const items: vscode.QuickPickItem[] = [
+            {
+                label: '$(file) Open File',
+                description: `Open ${filePath}`,
+                detail: 'Open the file in the editor'
+            },
+            {
+                label: '$(git-compare) Show Diff',
+                description: `Show diff for ${filePath}`,
+                detail: 'Show file changes in diff view'
+            },
+            {
+                label: '$(copy) Copy Path',
+                description: `Copy ${filePath}`,
+                detail: 'Copy file path to clipboard'
+            },
+            {
+                label: '$(folder-opened) Reveal in Explorer',
+                description: `Show ${filePath} in file explorer`,
+                detail: 'Reveal file in system file manager'
+            }
+        ];
+
+        const selection = await vscode.window.showQuickPick(items, {
+            placeHolder: `Actions for file: ${filePath}`,
+            title: 'File Actions'
+        });
+
+        if (selection) {
+            await this.handleFileAction(selection.label, filePath, webview);
+        }
+    }
+
+    private async handleFileAction(action: string, filePath: string, webview: vscode.Webview): Promise<void> {
+        switch (action) {
+            case '$(file) Open File':
+                await this.openFile(filePath);
+                break;
+            case '$(git-compare) Show Diff':
+                await this.showFileDiff(filePath, webview);
+                break;
+            case '$(copy) Copy Path':
+                await this.copyFilePath(filePath);
+                break;
+            case '$(folder-opened) Reveal in Explorer':
+                await this.revealFileInExplorer(filePath);
+                break;
+        }
+    }
+
+    private async openFile(filePath: string): Promise<void> {
+        try {
+            const uri = vscode.Uri.file(filePath);
+            const doc = await vscode.workspace.openTextDocument(uri);
+            await vscode.window.showTextDocument(doc);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to open file: ${error}`);
+        }
+    }
+
+    private async showFileDiff(filePath: string, webview: vscode.Webview): Promise<void> {
+        // This would show the file diff - implementation depends on your diff system
+        vscode.window.showInformationMessage(`Show diff for ${filePath} - Coming soon!`);
+    }
+
+    private async copyFilePath(filePath: string): Promise<void> {
+        try {
+            await vscode.env.clipboard.writeText(filePath);
+            vscode.window.showInformationMessage(`Copied path: ${filePath}`);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to copy path: ${error}`);
+        }
+    }
+
+    private async revealFileInExplorer(filePath: string): Promise<void> {
+        try {
+            const uri = vscode.Uri.file(filePath);
+            await vscode.commands.executeCommand('revealFileInOS', uri);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to reveal file: ${error}`);
+        }
+    }
 }

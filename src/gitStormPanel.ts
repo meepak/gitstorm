@@ -89,12 +89,7 @@ export class GitStormPanel {
                 case 'savePanelSizes':
                     this._panelSizes = message.sizes;
                     return;
-                case 'showBranchContextMenu':
-                    await this._contextMenuService.showBranchContextMenu({ name: message.branchName, isLocal: true, isRemote: false, isCurrent: false, commit: '' }, this._panel.webview);
-                    return;
-                case 'showCommitContextMenu':
-                    await this._contextMenuService.showCommitContextMenu({ hash: message.hash, shortHash: message.hash.substring(0, 7), message: '', author: '', date: new Date(), parents: [], refs: [] }, this._panel.webview);
-                    return;
+                // Context menu actions are now handled directly in the webview
                 case 'getCommitDetails':
                     console.log('Backend: Handling getCommitDetails for hash:', message.hash);
                     await this._handleGetCommitDetails(message.hash);
@@ -123,6 +118,30 @@ export class GitStormPanel {
                     return;
                 case 'getCommitsWithCompare':
                     await this._handleGetCommitsWithCompare(message.branch, message.compareBranch);
+                    return;
+                case 'revealFileInExplorer':
+                    await this._handleRevealFileInExplorer(message.filePath);
+                    return;
+                case 'revealDirectoryInExplorer':
+                    await this._handleRevealDirectoryInExplorer(message.directoryName);
+                    return;
+                case 'checkoutBranch':
+                    await this._handleCheckoutBranch(message.branchName);
+                    return;
+                case 'mergeBranch':
+                    await this._handleMergeBranch(message.branchName);
+                    return;
+                case 'deleteBranch':
+                    await this._handleDeleteBranch(message.branchName);
+                    return;
+                case 'createBranchFromCommit':
+                    await this._handleCreateBranchFromCommit(message.commitHash);
+                    return;
+                case 'cherryPickCommit':
+                    await this._handleCherryPickCommit(message.commitHash);
+                    return;
+                case 'revertCommit':
+                    await this._handleRevertCommit(message.commitHash);
                     return;
             }
         }, null, this._disposables);
@@ -943,6 +962,139 @@ export class GitStormPanel {
                 compareBranch: compareBranch,
                 error: error instanceof Error ? error.message : 'Unknown error'
             });
+        }
+    }
+
+    private async _handleRevealFileInExplorer(filePath: string): Promise<void> {
+        try {
+            const uri = vscode.Uri.file(filePath);
+            await vscode.commands.executeCommand('revealFileInOS', uri);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to reveal file: ${error}`);
+        }
+    }
+
+    private async _handleRevealDirectoryInExplorer(directoryName: string): Promise<void> {
+        try {
+            // For directories, we'll try to find the full path
+            // This is a simplified implementation - you might want to enhance this
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            if (workspaceFolder) {
+                const uri = vscode.Uri.joinPath(workspaceFolder.uri, directoryName);
+                await vscode.commands.executeCommand('revealFileInOS', uri);
+            } else {
+                vscode.window.showErrorMessage('No workspace folder found');
+            }
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to reveal directory: ${error}`);
+        }
+    }
+
+    private async _handleCheckoutBranch(branchName: string): Promise<void> {
+        try {
+            const success = await this._gitService.checkoutBranch(branchName);
+            if (success) {
+                vscode.window.showInformationMessage(`Switched to branch: ${branchName}`);
+                await this.refresh();
+            } else {
+                vscode.window.showErrorMessage(`Failed to checkout branch: ${branchName}`);
+            }
+        } catch (error) {
+            vscode.window.showErrorMessage(`Error checking out branch: ${error}`);
+        }
+    }
+
+    private async _handleMergeBranch(branchName: string): Promise<void> {
+        try {
+            const success = await this._gitService.mergeBranch(branchName);
+            if (success) {
+                vscode.window.showInformationMessage(`Merged ${branchName} into current branch`);
+                await this.refresh();
+            } else {
+                vscode.window.showErrorMessage(`Failed to merge branch: ${branchName}`);
+            }
+        } catch (error) {
+            vscode.window.showErrorMessage(`Error merging branch: ${error}`);
+        }
+    }
+
+    private async _handleDeleteBranch(branchName: string): Promise<void> {
+        const confirm = await vscode.window.showWarningMessage(
+            `Are you sure you want to delete branch "${branchName}"?`,
+            { modal: true },
+            'Delete'
+        );
+
+        if (confirm === 'Delete') {
+            try {
+                const success = await this._gitService.deleteBranch(branchName, true);
+                if (success) {
+                    vscode.window.showInformationMessage(`Deleted branch: ${branchName}`);
+                    await this.refresh();
+                } else {
+                    vscode.window.showErrorMessage(`Failed to delete branch: ${branchName}`);
+                }
+            } catch (error) {
+                vscode.window.showErrorMessage(`Error deleting branch: ${error}`);
+            }
+        }
+    }
+
+    private async _handleCreateBranchFromCommit(commitHash: string): Promise<void> {
+        const branchName = await vscode.window.showInputBox({
+            prompt: 'Enter new branch name',
+            placeHolder: 'new-branch-name',
+            value: `feature/${commitHash.substring(0, 7)}`
+        });
+
+        if (branchName) {
+            try {
+                const success = await this._gitService.createBranch(branchName, commitHash);
+                if (success) {
+                    vscode.window.showInformationMessage(`Created branch: ${branchName}`);
+                    await this.refresh();
+                } else {
+                    vscode.window.showErrorMessage(`Failed to create branch: ${branchName}`);
+                }
+            } catch (error) {
+                vscode.window.showErrorMessage(`Error creating branch: ${error}`);
+            }
+        }
+    }
+
+    private async _handleCherryPickCommit(commitHash: string): Promise<void> {
+        try {
+            const success = await this._gitService.cherryPickCommit(commitHash);
+            if (success) {
+                vscode.window.showInformationMessage(`Cherry picked commit: ${commitHash.substring(0, 7)}`);
+                await this.refresh();
+            } else {
+                vscode.window.showErrorMessage(`Failed to cherry pick commit: ${commitHash.substring(0, 7)}`);
+            }
+        } catch (error) {
+            vscode.window.showErrorMessage(`Error cherry picking commit: ${error}`);
+        }
+    }
+
+    private async _handleRevertCommit(commitHash: string): Promise<void> {
+        const confirm = await vscode.window.showWarningMessage(
+            `Are you sure you want to revert commit "${commitHash.substring(0, 7)}"?`,
+            { modal: true },
+            'Revert'
+        );
+
+        if (confirm === 'Revert') {
+            try {
+                const success = await this._gitService.revertCommit(commitHash);
+                if (success) {
+                    vscode.window.showInformationMessage(`Reverted commit: ${commitHash.substring(0, 7)}`);
+                    await this.refresh();
+                } else {
+                    vscode.window.showErrorMessage(`Failed to revert commit: ${commitHash.substring(0, 7)}`);
+                }
+            } catch (error) {
+                vscode.window.showErrorMessage(`Error reverting commit: ${error}`);
+            }
         }
     }
 
