@@ -15,6 +15,7 @@ class PanelController {
         this.compareAgainst = localStorage.getItem('gitstorm-compare-against') || 'previous'; // 'previous', 'branch', 'working'
         this.selectedCompareBranch = localStorage.getItem('gitstorm-compare-branch') || null;
         this.fileCompareData = {}; // Store compare data for file items
+        this.selectedFileId = null; // Track currently selected file
         this.initialize();
     }
 
@@ -664,6 +665,10 @@ class PanelController {
         this.currentBranch = branchName;
         this.selectedCommits.clear();
         
+        // Reset file changes panel when branch changes
+        this.clearFileChangesPanel();
+        this.selectedFileId = null;
+        
         this.vscode.postMessage({ 
             command: 'selectBranch',
             branchName: branchName
@@ -731,6 +736,26 @@ class PanelController {
                 item.classList.remove('selected');
             }
         });
+    }
+
+    updateFileSelection(fileId) {
+        // Clear previous file selection
+        const previousSelected = document.querySelector('.file-tree-item.file.selected');
+        if (previousSelected) {
+            previousSelected.classList.remove('selected');
+        }
+        
+        // Set new file selection
+        if (fileId) {
+            const fileItem = document.querySelector(`[data-file-id="${fileId}"]`);
+            if (fileItem) {
+                fileItem.classList.add('selected');
+                this.selectedFileId = fileId;
+                console.log('Selected file:', fileId);
+            }
+        } else {
+            this.selectedFileId = null;
+        }
     }
 
     showCommitFileChanges(hash) {
@@ -877,10 +902,16 @@ class PanelController {
                 const fileId = `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
                 
                 html += `
-                    <div class="file-tree-item file" style="margin-left: ${depth * 8}px" onclick="showFileDiffWithCompare('${item.file}', '${fileId}')" data-file-id="${fileId}">
-                        <span class="file-icon">${statusIcon}</span>
-                        <span class="file-name">${name}</span>
-                        <span class="file-stats">${changeStats}</span>
+                    <div class="file-tree-item file" style="margin-left: ${depth * 8}px" data-file-id="${fileId}">
+                        <div class="file-content" onclick="showFileDiffWithCompare('${item.file}', '${fileId}')">
+                            <span class="file-icon">${statusIcon}</span>
+                            <span class="file-name">${name}</span>
+                            <span class="file-stats">${changeStats}</span>
+                        </div>
+                        <div class="file-actions">
+                            <span class="action-icon" title="Open editable diff" onclick="event.stopPropagation(); showEditableDiff('${item.file}', '${fileId}')">✏️</span>
+                            <span class="action-icon" title="Open working file" onclick="event.stopPropagation(); openWorkingFile('${item.file}')">📄</span>
+                        </div>
                     </div>
                 `;
                 
@@ -1137,6 +1168,9 @@ function showMultiCommitFileDiff(filePath, commitHashes) {
 function showFileDiffWithCompare(filePath, fileId) {
     console.log('Show file diff with file ID:', filePath, fileId);
     
+    // Update selected file highlighting
+    panelController.updateFileSelection(fileId);
+    
     // Get the compare data from the stored data
     const compareData = panelController.fileCompareData && panelController.fileCompareData[fileId];
     if (!compareData) {
@@ -1162,6 +1196,32 @@ function changeCompareBranch(branchName) {
 
 function showWorkingDirectoryChanges() {
     panelController.showWorkingDirectoryChanges();
+}
+
+function showEditableDiff(filePath, fileId) {
+    console.log('Show editable diff for:', filePath, fileId);
+    
+    // Get the compare data from the stored data
+    const compareData = panelController.fileCompareData && panelController.fileCompareData[fileId];
+    if (!compareData) {
+        console.error('No compare data found for file ID:', fileId);
+        return;
+    }
+    
+    console.log('Editable diff compare data:', compareData);
+    panelController.vscode.postMessage({
+        command: 'showEditableDiff',
+        filePath: filePath,
+        compareData: compareData
+    });
+}
+
+function openWorkingFile(filePath) {
+    console.log('Open working file:', filePath);
+    panelController.vscode.postMessage({
+        command: 'openWorkingFile',
+        filePath: filePath
+    });
 }
 
 // Initialize when DOM is ready

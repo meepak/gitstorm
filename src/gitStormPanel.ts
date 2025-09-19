@@ -115,6 +115,12 @@ export class GitStormPanel {
                 case 'showWorkingDirectoryChanges':
                     await this._handleShowWorkingDirectoryChanges();
                     return;
+                case 'showEditableDiff':
+                    await this._handleShowEditableDiff(message.filePath, message.compareData);
+                    return;
+                case 'openWorkingFile':
+                    await this._handleOpenWorkingFile(message.filePath);
+                    return;
             }
         }, null, this._disposables);
 
@@ -300,14 +306,15 @@ export class GitStormPanel {
                  language: this._getLanguageFromFile(filePath)
                });
                
-               // Show the diff using VS Code's built-in diff viewer
+               // Show the diff using VS Code's built-in diff viewer in read-only mode
                await vscode.commands.executeCommand(
                  'vscode.diff',
                  parentDoc.uri,
                  commitDoc.uri,
                  `${filePath} (${commitHash.substring(0, 7)})`,
                  {
-                   viewColumn: vscode.ViewColumn.Beside
+                   viewColumn: vscode.ViewColumn.Beside,
+                   preview: true
                  }
                );
                
@@ -322,10 +329,10 @@ export class GitStormPanel {
                  language: 'diff'
                });
                
-               // Show the diff document
+               // Show the diff document in read-only mode
                await vscode.window.showTextDocument(diffDocument, {
                  viewColumn: vscode.ViewColumn.Beside,
-                 preview: false
+                 preview: true
                });
                
                vscode.window.setStatusBarMessage(`Diff for ${filePath} (${commitHash.substring(0, 7)})`, 5000);
@@ -453,33 +460,27 @@ export class GitStormPanel {
          const firstCommit = sortedCommits[0];
          const lastCommit = sortedCommits[sortedCommits.length - 1];
          
-         // Get file content at the first commit's parent and last commit
-         const [parentContent, lastCommitContent] = await Promise.all([
-           this._gitService.getFileContentAtCommit(`${firstCommit}~1`, filePath),
-           this._gitService.getFileContentAtCommit(lastCommit, filePath)
-         ]);
-
-         // Create temporary documents for the diff
-         const parentDoc = await vscode.workspace.openTextDocument({
-           content: parentContent || '',
-           language: this._getLanguageFromFile(filePath)
-         });
-
-         const lastCommitDoc = await vscode.workspace.openTextDocument({
-           content: lastCommitContent || '',
-           language: this._getLanguageFromFile(filePath)
-         });
-
-         // Show the diff using VS Code's built-in diff viewer
-         await vscode.commands.executeCommand(
-           'vscode.diff',
-           parentDoc.uri,
-           lastCommitDoc.uri,
-           `${filePath} (${selectedCommits.length} commits)`,
-           {
-             viewColumn: vscode.ViewColumn.Beside
-           }
+         // For multiple commits, show the diff range using git diff
+         const diffContent = await this._gitService.getFileDiffRange(
+           `${firstCommit}~1..${lastCommit}`,
+           filePath
          );
+
+         if (!diffContent || diffContent.trim() === '') {
+           vscode.window.showInformationMessage(`No changes found for ${filePath} across ${selectedCommits.length} commits`);
+           return;
+         }
+
+         // Show diff content in a read-only text document
+         const diffDocument = await vscode.workspace.openTextDocument({
+           content: diffContent,
+           language: 'diff'
+         });
+
+         await vscode.window.showTextDocument(diffDocument, {
+           viewColumn: vscode.ViewColumn.Beside,
+           preview: true
+         });
 
          vscode.window.setStatusBarMessage(`Diff for ${filePath} (${selectedCommits.length} commits)`, 5000);
        }
@@ -494,36 +495,29 @@ export class GitStormPanel {
          }
 
          if (selectedCommits.length === 1) {
-           // Single commit - compare with branch using VS Code's built-in diff
+           // Single commit - compare with branch using git diff
            const commitHash = selectedCommits[0];
            
-           // Get file content at the commit and branch
-           const [commitContent, branchContent] = await Promise.all([
-             this._gitService.getFileContentAtCommit(commitHash, filePath),
-             this._gitService.getFileContentAtCommit(compareBranch, filePath)
-           ]);
-
-           // Create temporary documents for the diff
-           const commitDoc = await vscode.workspace.openTextDocument({
-             content: commitContent || '',
-             language: this._getLanguageFromFile(filePath)
-           });
-
-           const branchDoc = await vscode.workspace.openTextDocument({
-             content: branchContent || '',
-             language: this._getLanguageFromFile(filePath)
-           });
-
-           // Show the diff using VS Code's built-in diff viewer
-           await vscode.commands.executeCommand(
-             'vscode.diff',
-             branchDoc.uri,
-             commitDoc.uri,
-             `${filePath} (${compareBranch} vs ${commitHash.substring(0, 7)})`,
-             {
-               viewColumn: vscode.ViewColumn.Beside
-             }
+           const diffContent = await this._gitService.getFileDiffRange(
+             `${compareBranch}..${commitHash}`,
+             filePath
            );
+
+           if (!diffContent || diffContent.trim() === '') {
+             vscode.window.showInformationMessage(`No changes found for ${filePath} between ${compareBranch} and ${commitHash.substring(0, 7)}`);
+             return;
+           }
+
+           // Show diff content in a read-only text document
+           const diffDocument = await vscode.workspace.openTextDocument({
+             content: diffContent,
+             language: 'diff'
+           });
+
+           await vscode.window.showTextDocument(diffDocument, {
+             viewColumn: vscode.ViewColumn.Beside,
+             preview: true
+           });
 
            vscode.window.setStatusBarMessage(`Diff for ${filePath} (${compareBranch} vs ${commitHash.substring(0, 7)})`, 5000);
 
@@ -532,33 +526,26 @@ export class GitStormPanel {
            const sortedCommits = selectedCommits.sort();
            const lastCommit = sortedCommits[sortedCommits.length - 1];
            
-           // Get file content at the last commit and branch
-           const [commitContent, branchContent] = await Promise.all([
-             this._gitService.getFileContentAtCommit(lastCommit, filePath),
-             this._gitService.getFileContentAtCommit(compareBranch, filePath)
-           ]);
-
-           // Create temporary documents for the diff
-           const commitDoc = await vscode.workspace.openTextDocument({
-             content: commitContent || '',
-             language: this._getLanguageFromFile(filePath)
-           });
-
-           const branchDoc = await vscode.workspace.openTextDocument({
-             content: branchContent || '',
-             language: this._getLanguageFromFile(filePath)
-           });
-
-           // Show the diff using VS Code's built-in diff viewer
-           await vscode.commands.executeCommand(
-             'vscode.diff',
-             branchDoc.uri,
-             commitDoc.uri,
-             `${filePath} (${compareBranch} vs ${selectedCommits.length} commits)`,
-             {
-               viewColumn: vscode.ViewColumn.Beside
-             }
+           const diffContent = await this._gitService.getFileDiffRange(
+             `${compareBranch}..${lastCommit}`,
+             filePath
            );
+
+           if (!diffContent || diffContent.trim() === '') {
+             vscode.window.showInformationMessage(`No changes found for ${filePath} between ${compareBranch} and ${selectedCommits.length} commits`);
+             return;
+           }
+
+           // Show diff content in a read-only text document
+           const diffDocument = await vscode.workspace.openTextDocument({
+             content: diffContent,
+             language: 'diff'
+           });
+
+           await vscode.window.showTextDocument(diffDocument, {
+             viewColumn: vscode.ViewColumn.Beside,
+             preview: true
+           });
 
            vscode.window.setStatusBarMessage(`Diff for ${filePath} (${compareBranch} vs ${selectedCommits.length} commits)`, 5000);
          }
@@ -577,36 +564,29 @@ export class GitStormPanel {
          }
 
          if (selectedCommits.length === 1) {
-           // Single commit - compare with working directory using VS Code's built-in diff
+           // Single commit - compare with working directory using git diff
            const commitHash = selectedCommits[0];
            
-           // Get file content at the commit and current working directory
-           const [commitContent, workingContent] = await Promise.all([
-             this._gitService.getFileContentAtCommit(commitHash, filePath),
-             this._getWorkingDirectoryFileContent(filePath)
-           ]);
-
-           // Create temporary documents for the diff
-           const commitDoc = await vscode.workspace.openTextDocument({
-             content: commitContent || '',
-             language: this._getLanguageFromFile(filePath)
-           });
-
-           const workingDoc = await vscode.workspace.openTextDocument({
-             content: workingContent || '',
-             language: this._getLanguageFromFile(filePath)
-           });
-
-           // Show the diff using VS Code's built-in diff viewer
-           await vscode.commands.executeCommand(
-             'vscode.diff',
-             commitDoc.uri,
-             workingDoc.uri,
-             `${filePath} (${commitHash.substring(0, 7)} vs working directory)`,
-             {
-               viewColumn: vscode.ViewColumn.Beside
-             }
+           const diffContent = await this._gitService.getFileDiffRange(
+             `${commitHash}..HEAD`,
+             filePath
            );
+
+           if (!diffContent || diffContent.trim() === '') {
+             vscode.window.showInformationMessage(`No changes found for ${filePath} between ${commitHash.substring(0, 7)} and working directory`);
+             return;
+           }
+
+           // Show diff content in a read-only text document
+           const diffDocument = await vscode.workspace.openTextDocument({
+             content: diffContent,
+             language: 'diff'
+           });
+
+           await vscode.window.showTextDocument(diffDocument, {
+             viewColumn: vscode.ViewColumn.Beside,
+             preview: true
+           });
 
            vscode.window.setStatusBarMessage(`Diff for ${filePath} (${commitHash.substring(0, 7)} vs working directory)`, 5000);
 
@@ -615,33 +595,26 @@ export class GitStormPanel {
            const sortedCommits = selectedCommits.sort();
            const lastCommit = sortedCommits[sortedCommits.length - 1];
            
-           // Get file content at the last commit and current working directory
-           const [commitContent, workingContent] = await Promise.all([
-             this._gitService.getFileContentAtCommit(lastCommit, filePath),
-             this._getWorkingDirectoryFileContent(filePath)
-           ]);
-
-           // Create temporary documents for the diff
-           const commitDoc = await vscode.workspace.openTextDocument({
-             content: commitContent || '',
-             language: this._getLanguageFromFile(filePath)
-           });
-
-           const workingDoc = await vscode.workspace.openTextDocument({
-             content: workingContent || '',
-             language: this._getLanguageFromFile(filePath)
-           });
-
-           // Show the diff using VS Code's built-in diff viewer
-           await vscode.commands.executeCommand(
-             'vscode.diff',
-             commitDoc.uri,
-             workingDoc.uri,
-             `${filePath} (${selectedCommits.length} commits vs working directory)`,
-             {
-               viewColumn: vscode.ViewColumn.Beside
-             }
+           const diffContent = await this._gitService.getFileDiffRange(
+             `${lastCommit}..HEAD`,
+             filePath
            );
+
+           if (!diffContent || diffContent.trim() === '') {
+             vscode.window.showInformationMessage(`No changes found for ${filePath} between ${selectedCommits.length} commits and working directory`);
+             return;
+           }
+
+           // Show diff content in a read-only text document
+           const diffDocument = await vscode.workspace.openTextDocument({
+             content: diffContent,
+             language: 'diff'
+           });
+
+           await vscode.window.showTextDocument(diffDocument, {
+             viewColumn: vscode.ViewColumn.Beside,
+             preview: true
+           });
 
            vscode.window.setStatusBarMessage(`Diff for ${filePath} (${selectedCommits.length} commits vs working directory)`, 5000);
          }
@@ -717,10 +690,224 @@ export class GitStormPanel {
          'gitattributes': 'ignore'
        };
        
-       return languageMap[extension || ''] || 'plaintext';
-     }
-    
-    
+      return languageMap[extension || ''] || 'plaintext';
+    }
+
+    private async _handleShowEditableDiff(filePath: string, compareData: any) {
+      try {
+        const ws = vscode.workspace.workspaceFolders?.[0];
+        if (!ws) {
+          vscode.window.showErrorMessage('No workspace folder found');
+          return;
+        }
+
+        const { compareAgainst, selectedCommits, compareBranch } = compareData;
+
+        if (compareAgainst === 'previous') {
+          await this._handleEditablePreviousCommitDiff(filePath, selectedCommits);
+        } else if (compareAgainst === 'branch') {
+          await this._handleEditableBranchDiff(filePath, selectedCommits, compareBranch);
+        } else if (compareAgainst === 'working') {
+          await this._handleEditableWorkingDirectoryDiff(filePath, selectedCommits);
+        }
+      } catch (err) {
+        console.error('Error showing editable diff:', err);
+        vscode.window.showErrorMessage(`Failed to show editable diff: ${String(err)}`);
+      }
+    }
+
+    private async _handleEditablePreviousCommitDiff(filePath: string, selectedCommits: string[]) {
+      if (selectedCommits.length === 1) {
+        // Single commit - create editable diff with temporary documents
+        const ws = vscode.workspace.workspaceFolders?.[0];
+        if (!ws) return;
+        
+        const commitHash = selectedCommits[0];
+        
+        // Get the file content at the commit and its parent
+        const [commitContent, parentContent] = await Promise.all([
+          this._gitService.getFileContentAtCommit(commitHash, filePath),
+          this._gitService.getFileContentAtCommit(`${commitHash}~1`, filePath)
+        ]);
+        
+        // Create temporary documents for the diff
+        const commitDoc = await vscode.workspace.openTextDocument({
+          content: commitContent || '',
+          language: this._getLanguageFromFile(filePath)
+        });
+        
+        const parentDoc = await vscode.workspace.openTextDocument({
+          content: parentContent || '',
+          language: this._getLanguageFromFile(filePath)
+        });
+        
+        // Show the diff using VS Code's built-in diff viewer in editable mode
+        await vscode.commands.executeCommand(
+          'vscode.diff',
+          parentDoc.uri,
+          commitDoc.uri,
+          `${filePath} (${commitHash.substring(0, 7)})`,
+          {
+            viewColumn: vscode.ViewColumn.Beside
+          }
+        );
+      } else {
+        // Multiple commits - show diff range
+        const sortedCommits = selectedCommits.sort();
+        const firstCommit = sortedCommits[0];
+        const lastCommit = sortedCommits[sortedCommits.length - 1];
+        
+        const diffContent = await this._gitService.getFileDiffRange(
+          `${firstCommit}~1..${lastCommit}`,
+          filePath
+        );
+
+        if (!diffContent || diffContent.trim() === '') {
+          vscode.window.showInformationMessage(`No changes found for ${filePath} across ${selectedCommits.length} commits`);
+          return;
+        }
+
+        // Show diff content in an editable text document
+        const diffDocument = await vscode.workspace.openTextDocument({
+          content: diffContent,
+          language: 'diff'
+        });
+
+        await vscode.window.showTextDocument(diffDocument, {
+          viewColumn: vscode.ViewColumn.Beside
+        });
+      }
+    }
+
+    private async _handleEditableBranchDiff(filePath: string, selectedCommits: string[], compareBranch: string) {
+      const sortedCommits = selectedCommits.sort();
+      const lastCommit = sortedCommits[sortedCommits.length - 1];
+      
+      if (selectedCommits.length === 1) {
+        // Single commit - create editable diff with temporary documents
+        const [commitContent, branchContent] = await Promise.all([
+          this._gitService.getFileContentAtCommit(lastCommit, filePath),
+          this._gitService.getFileContentAtCommit(compareBranch, filePath)
+        ]);
+
+        // Create temporary documents for the diff
+        const commitDoc = await vscode.workspace.openTextDocument({
+          content: commitContent || '',
+          language: this._getLanguageFromFile(filePath)
+        });
+
+        const branchDoc = await vscode.workspace.openTextDocument({
+          content: branchContent || '',
+          language: this._getLanguageFromFile(filePath)
+        });
+
+        // Show the diff using VS Code's built-in diff viewer in editable mode
+        await vscode.commands.executeCommand(
+          'vscode.diff',
+          branchDoc.uri,
+          commitDoc.uri,
+          `${filePath} (${compareBranch} vs ${lastCommit.substring(0, 7)})`,
+          {
+            viewColumn: vscode.ViewColumn.Beside
+          }
+        );
+      } else {
+        // Multiple commits - show diff range
+        const diffContent = await this._gitService.getFileDiffRange(
+          `${compareBranch}..${lastCommit}`,
+          filePath
+        );
+
+        if (!diffContent || diffContent.trim() === '') {
+          vscode.window.showInformationMessage(`No changes found for ${filePath} between ${compareBranch} and ${selectedCommits.length} commits`);
+          return;
+        }
+
+        // Show diff content in an editable text document
+        const diffDocument = await vscode.workspace.openTextDocument({
+          content: diffContent,
+          language: 'diff'
+        });
+
+        await vscode.window.showTextDocument(diffDocument, {
+          viewColumn: vscode.ViewColumn.Beside
+        });
+      }
+    }
+
+    private async _handleEditableWorkingDirectoryDiff(filePath: string, selectedCommits: string[]) {
+      const sortedCommits = selectedCommits.sort();
+      const lastCommit = sortedCommits[sortedCommits.length - 1];
+      
+      if (selectedCommits.length === 1) {
+        // Single commit - create editable diff with temporary documents
+        const [commitContent, workingContent] = await Promise.all([
+          this._gitService.getFileContentAtCommit(lastCommit, filePath),
+          this._getWorkingDirectoryFileContent(filePath)
+        ]);
+
+        // Create temporary documents for the diff
+        const commitDoc = await vscode.workspace.openTextDocument({
+          content: commitContent || '',
+          language: this._getLanguageFromFile(filePath)
+        });
+
+        const workingDoc = await vscode.workspace.openTextDocument({
+          content: workingContent || '',
+          language: this._getLanguageFromFile(filePath)
+        });
+
+        // Show the diff using VS Code's built-in diff viewer in editable mode
+        await vscode.commands.executeCommand(
+          'vscode.diff',
+          commitDoc.uri,
+          workingDoc.uri,
+          `${filePath} (${lastCommit.substring(0, 7)} vs working directory)`,
+          {
+            viewColumn: vscode.ViewColumn.Beside
+          }
+        );
+      } else {
+        // Multiple commits - show diff range
+        const diffContent = await this._gitService.getFileDiffRange(
+          `${lastCommit}..HEAD`,
+          filePath
+        );
+
+        if (!diffContent || diffContent.trim() === '') {
+          vscode.window.showInformationMessage(`No changes found for ${filePath} between ${selectedCommits.length} commits and working directory`);
+          return;
+        }
+
+        // Show diff content in an editable text document
+        const diffDocument = await vscode.workspace.openTextDocument({
+          content: diffContent,
+          language: 'diff'
+        });
+
+        await vscode.window.showTextDocument(diffDocument, {
+          viewColumn: vscode.ViewColumn.Beside
+        });
+      }
+    }
+
+    private async _handleOpenWorkingFile(filePath: string) {
+      try {
+        const ws = vscode.workspace.workspaceFolders?.[0];
+        if (!ws) {
+          vscode.window.showErrorMessage('No workspace folder found');
+          return;
+        }
+
+        const fileUri = vscode.Uri.joinPath(ws.uri, filePath);
+        await vscode.window.showTextDocument(fileUri, {
+          viewColumn: vscode.ViewColumn.Beside
+        });
+      } catch (err) {
+        console.error('Error opening working file:', err);
+        vscode.window.showErrorMessage(`Failed to open file: ${String(err)}`);
+      }
+    }
 
     public dispose() {
         GitStormPanel.currentPanel = undefined;

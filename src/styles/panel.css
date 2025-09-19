@@ -509,6 +509,7 @@ input[type="text"]:focus {
     display: flex;
     flex-direction: column;
     height: 100%;
+    overflow: hidden;
 }
 
 /* Compare Header Styles */
@@ -517,6 +518,7 @@ input[type="text"]:focus {
     border-bottom: 1px solid var(--vscode-panel-border);
     padding: 8px 12px;
     margin-bottom: 8px;
+    flex-shrink: 0;
 }
 
 .compare-header-content {
@@ -564,6 +566,7 @@ input[type="text"]:focus {
     border-bottom: 1px solid var(--vscode-panel-border);
     margin-bottom: 8px;
     padding-bottom: 8px;
+    min-height: 0;
 }
 
 .file-tree-item {
@@ -584,13 +587,52 @@ input[type="text"]:focus {
 .file-tree-item.file {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     padding: 2px 8px;
     border-radius: 2px;
     margin: 1px 0;
+    position: relative;
 }
 
 .file-tree-item.file:hover {
     background-color: var(--vscode-list-hoverBackground);
+}
+
+.file-tree-item.file.selected {
+    background-color: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
+}
+
+.file-content {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    cursor: pointer;
+}
+
+.file-actions {
+    display: none;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
+}
+
+.file-tree-item.file:hover .file-actions {
+    display: flex;
+}
+
+.action-icon {
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 2px;
+    font-size: 12px;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.action-icon:hover {
+    opacity: 1;
+    background-color: var(--vscode-toolbar-hoverBackground);
 }
 
 .file-tree-header {
@@ -663,6 +705,7 @@ input[type="text"]:focus {
     border: 1px solid var(--vscode-panel-border);
     border-radius: 3px;
     overflow: hidden;
+    flex-shrink: 0;
 }
 
 .commit-details-header {
