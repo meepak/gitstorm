@@ -16,6 +16,7 @@ class PanelController {
         this.selectedCompareBranch = localStorage.getItem('gitstorm-compare-branch') || null;
         this.fileCompareData = {}; // Store compare data for file items
         this.selectedFileId = null; // Track currently selected file
+        this.commitsCompareAgainst = localStorage.getItem('gitstorm-commits-compare-against') || 'none'; // 'none' or branch name
         this.initialize();
     }
 
@@ -54,6 +55,10 @@ class PanelController {
                 case 'multiCommitFiles':
                     console.log('Received multi-commit files:', message.files);
                     this.updateFileChangesPanel(null, message.files);
+                    break;
+                case 'updateCommitsWithCompare':
+                    console.log('Received commits with compare:', message.commits?.length, 'for branch:', message.branch, 'excluding:', message.compareBranch);
+                    this.updateCommitsWithCompare(message.commits, message.branch, message.compareBranch, message.error);
                     break;
                 default:
                     console.log('WebView received unknown message command:', message.command);
@@ -178,6 +183,7 @@ class PanelController {
             } else if (commits && commits.length > 0) {
                 this.commits = commits;
                 this.populateUserFilter(commits);
+                this.populateCommitsCompareFilter();
                 commitsContent.innerHTML = this.generateCommitsHtml(commits, this.commitsSearchTerm, this.selectedUser);
                 // Restore commit selection after content update
                 setTimeout(() => this.updateCommitSelection(), 10);
@@ -593,6 +599,26 @@ class PanelController {
         userFilter.value = this.selectedUser;
     }
 
+    populateCommitsCompareFilter() {
+        const compareSelect = document.querySelector('.commits-compare .compare-select');
+        if (!compareSelect) return;
+
+        // Clear existing options except "None"
+        compareSelect.innerHTML = '<option value="none">None</option>';
+        
+        // Add branch options
+        this.branches.forEach(branch => {
+            const option = document.createElement('option');
+            option.value = branch.name;
+            const displayName = branch.isRemote ? branch.name.split('/').slice(1).join('/') : branch.name;
+            option.textContent = displayName;
+            compareSelect.appendChild(option);
+        });
+        
+        // Set current selection
+        compareSelect.value = this.commitsCompareAgainst;
+    }
+
     toggleSection(sectionId) {
         const content = document.getElementById(`${sectionId}-content`);
         const header = document.querySelector(`[onclick="toggleSection('${sectionId}')"]`);
@@ -669,10 +695,23 @@ class PanelController {
         this.clearFileChangesPanel();
         this.selectedFileId = null;
         
-        this.vscode.postMessage({ 
-            command: 'selectBranch',
-            branchName: branchName
-        });
+        // Update branch highlighting immediately
+        this.updateBranchHighlighting(branchName);
+        
+        // Use the remembered compare against value to get commits for the new branch
+        if (this.commitsCompareAgainst && this.commitsCompareAgainst !== 'none') {
+            this.vscode.postMessage({
+                command: 'getCommitsWithCompare',
+                branch: branchName,
+                compareBranch: this.commitsCompareAgainst
+            });
+        } else {
+            // If no compare selection, use the regular branch selection
+            this.vscode.postMessage({ 
+                command: 'selectBranch',
+                branchName: branchName
+            });
+        }
     }
 
     selectCommit(hash, event = null) {
@@ -1099,6 +1138,77 @@ class PanelController {
             this.showMultiCommitFileChanges(selectedCommits);
         }
     }
+
+    changeCommitsCompareOption(branchName) {
+        this.commitsCompareAgainst = branchName;
+        
+        // Save the selection to localStorage
+        localStorage.setItem('gitstorm-commits-compare-against', branchName);
+        
+        // Request commits with compare from backend
+        if (this.currentBranch) {
+            this.vscode.postMessage({
+                command: 'getCommitsWithCompare',
+                branch: this.currentBranch,
+                compareBranch: branchName
+            });
+        } else {
+            // If no branch selected, refresh current commits
+            this.filterCommits();
+        }
+    }
+
+    updateCommitsWithCompare(commits, branch, compareBranch, error) {
+        if (error) {
+            console.error('Error loading commits with compare:', error);
+            const commitsContent = document.getElementById('commitsContent');
+            if (commitsContent) {
+                commitsContent.innerHTML = `<div class="empty-state"><h3>Error</h3><p>${error}</p></div>`;
+            }
+            return;
+        }
+
+        // Update the commits array
+        this.commits = commits || [];
+        
+        // Update the compare dropdown selection to match what was used
+        const compareSelect = document.querySelector('.commits-compare .compare-select');
+        if (compareSelect) {
+            compareSelect.value = compareBranch || 'none';
+        }
+        
+        // Update branch highlighting to show the selected branch
+        this.updateBranchHighlighting(branch);
+        
+        // Update the commits display
+        const commitsContent = document.getElementById('commitsContent');
+        if (commitsContent) {
+            const newHtml = this.generateCommitsHtml(this.commits, this.commitsSearchTerm, this.selectedUser);
+            commitsContent.innerHTML = newHtml;
+            // Restore commit selection after content update
+            setTimeout(() => this.updateCommitSelection(), 10);
+        }
+    }
+
+    updateBranchHighlighting(selectedBranch) {
+        // Update branch highlighting in the branches panel
+        const branchItems = document.querySelectorAll('.branch-item');
+        branchItems.forEach(item => {
+            const branchName = item.getAttribute('onclick');
+            if (branchName) {
+                // Extract branch name from onclick="selectBranch('branchName')"
+                const match = branchName.match(/selectBranch\('([^']+)'\)/);
+                if (match) {
+                    const itemBranchName = match[1];
+                    if (itemBranchName === selectedBranch) {
+                        item.classList.add('current');
+                    } else {
+                        item.classList.remove('current');
+                    }
+                }
+            }
+        });
+    }
 }
 
 // Global functions for HTML onclick handlers
@@ -1192,6 +1302,10 @@ function changeCompareOption(option) {
 
 function changeCompareBranch(branchName) {
     panelController.changeCompareBranch(branchName);
+}
+
+function changeCommitsCompareOption(branchName) {
+    panelController.changeCommitsCompareOption(branchName);
 }
 
 function showWorkingDirectoryChanges() {

@@ -121,6 +121,9 @@ export class GitStormPanel {
                 case 'openWorkingFile':
                     await this._handleOpenWorkingFile(message.filePath);
                     return;
+                case 'getCommitsWithCompare':
+                    await this._handleGetCommitsWithCompare(message.branch, message.compareBranch);
+                    return;
             }
         }, null, this._disposables);
 
@@ -907,6 +910,40 @@ export class GitStormPanel {
         console.error('Error opening working file:', err);
         vscode.window.showErrorMessage(`Failed to open file: ${String(err)}`);
       }
+    }
+
+    private async _handleGetCommitsWithCompare(branch: string, compareBranch: string) {
+        try {
+            console.log('Getting commits for branch:', branch, 'excluding:', compareBranch);
+            let commits;
+            
+            if (compareBranch && compareBranch !== 'none') {
+                // Get commits that are in the branch but not in the compare branch
+                commits = await this._gitService.getCommitsExcludingBranch(branch, compareBranch);
+            } else {
+                // Get all commits for the branch
+                commits = await this._gitService.getCommits(branch);
+            }
+
+            console.log('Loaded commits with compare:', commits.length);
+            
+            // Send commits back to WebView
+            this._panel.webview.postMessage({
+                command: 'updateCommitsWithCompare',
+                commits: commits,
+                branch: branch,
+                compareBranch: compareBranch
+            });
+        } catch (error) {
+            console.error('Error getting commits with compare:', error);
+            this._panel.webview.postMessage({
+                command: 'updateCommitsWithCompare',
+                commits: [],
+                branch: branch,
+                compareBranch: compareBranch,
+                error: error instanceof Error ? error.message : 'Unknown error'
+            });
+        }
     }
 
     public dispose() {

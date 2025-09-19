@@ -15,12 +15,14 @@
     
     <div class="main-content">
         <div class="panel branches-panel">
-            <div class="panel-header">Branches</div>
-            <div class="panel-content">
+            <div class="panel-header">
+                <span>Branches</span>
                 <div class="search-container">
                     <input type="text" placeholder="Search branches..." />
                     <button class="clear-search" onclick="clearSearch()" title="Clear search">×</button>
                 </div>
+            </div>
+            <div class="panel-content">
                 <div id="branchesContent">
                     <div class="loading">Loading branches...</div>
                 </div>
@@ -29,19 +31,31 @@
         </div>
         
         <div class="panel commits-panel">
-            <div class="panel-header">Commits</div>
-            <div class="panel-content">
-                <div class="commits-filters">
-                    <div class="search-container">
-                        <input type="text" placeholder="Search commits..." />
-                        <button class="clear-search" onclick="clearCommitsSearch()" title="Clear search">×</button>
-                    </div>
-                    <select class="user-filter" onchange="filterByUser(this.value)">
-                        <option value="all">All</option>
-                    </select>
+            <div class="panel-header">
+                <span>Commits</span>
+                <div class="search-container">
+                    <input type="text" placeholder="Search commits..." />
+                    <button class="clear-search" onclick="clearCommitsSearch()" title="Clear search">×</button>
                 </div>
-                <div id="commitsContent">
-                    <div class="loading">Loading commits...</div>
+            </div>
+            <div class="panel-content">
+                <div class="commits-header">
+                    <div class="commits-filters">
+                        <select class="user-filter" onchange="filterByUser(this.value)">
+                            <option value="all">All</option>
+                        </select>
+                        <div class="commits-compare">
+                            <span class="compare-icon">🔄</span>
+                            <select class="compare-select" onchange="changeCommitsCompareOption(this.value)">
+                                <option value="none">None</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="commits-content">
+                    <div id="commitsContent">
+                        <div class="loading">Loading commits...</div>
+                    </div>
                 </div>
             </div>
             <div class="resize-handle" data-panel="commits"></div>

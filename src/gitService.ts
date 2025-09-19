@@ -147,6 +147,45 @@ export class GitService {
         }
     }
 
+    async getCommitsExcludingBranch(branch: string, excludeBranch: string, limit: number = 100): Promise<Commit[]> {
+        try {
+            console.log('Getting commits for branch:', branch, 'excluding:', excludeBranch, 'limit:', limit);
+            
+            // Get commits that are in the branch but not in the exclude branch
+            const result = await this.git.raw([
+                'log', 
+                `--max-count=${limit}`, 
+                '--pretty=format:%H|%an|%ad|%s|%P', 
+                '--date=iso',
+                branch,
+                '--not',
+                excludeBranch
+            ]);
+            const log = this.parseRawGitLog(result);
+
+            console.log('Commits excluding branch log data:', log);
+            const commits: Commit[] = [];
+
+            for (const commit of log.all) {
+                commits.push({
+                    hash: commit.hash,
+                    shortHash: commit.hash.substring(0, 7),
+                    message: commit.message,
+                    author: commit.author_name,
+                    date: new Date(commit.date),
+                    parents: (commit as any).parent ? [(commit as any).parent] : [],
+                    refs: this.parseRefs(commit.refs)
+                });
+            }
+
+            console.log(`Loaded ${commits.length} commits for branch: ${branch} excluding: ${excludeBranch}`);
+            return commits;
+        } catch (error) {
+            console.error('Error getting commits excluding branch:', error);
+            return [];
+        }
+    }
+
     private parseRawGitLog(rawOutput: string): any {
         const commits: any[] = [];
         const lines = rawOutput.trim().split('\n');
