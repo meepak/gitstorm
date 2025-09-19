@@ -39,8 +39,8 @@ class PanelController {
             console.log('Message command:', message.command);
             switch (message.command) {
                 case 'updateContent':
-                    console.log('Processing updateContent:', { branches: message.branches?.length, commits: message.commits?.length, error: message.error });
-                    this.updateContent(message.branches, message.commits, message.error);
+                    console.log('Processing updateContent:', { branches: message.branches?.length, commits: message.commits?.length, error: message.error, hasUncommittedChanges: message.hasUncommittedChanges });
+                    this.updateContent(message.branches, message.commits, message.error, message.hasUncommittedChanges);
                     break;
                 case 'updatePanelSizes':
                     this.panelSizes = message.sizes;
@@ -228,6 +228,9 @@ class PanelController {
             case 'panel':
                 this.showPanelContextMenu();
                 break;
+            case 'uncommitted':
+                this.showUncommittedChangesContextMenu();
+                break;
             case 'text':
                 this.showTextContextMenu();
                 break;
@@ -295,6 +298,12 @@ class PanelController {
 
     showPanelContextMenu() {
         // Show panel-specific actions
+        this.contextMenu.querySelector('[data-action="refresh"]').style.display = 'flex';
+    }
+
+    showUncommittedChangesContextMenu() {
+        // Show uncommitted changes-specific actions
+        this.contextMenu.querySelector('[data-action="commit"]').style.display = 'flex';
         this.contextMenu.querySelector('[data-action="refresh"]').style.display = 'flex';
     }
 
@@ -376,6 +385,11 @@ class PanelController {
             case 'squash':
                 if (type === 'commit') {
                     this.squashCommits();
+                }
+                break;
+            case 'commit':
+                if (type === 'uncommitted') {
+                    this.commitChanges();
                 }
                 break;
             case 'refresh':
@@ -484,13 +498,58 @@ class PanelController {
         this.showSquashDialog();
     }
 
-    updateContent(branches, commits, error) {
-        console.log('Updating content:', { branches: branches?.length, commits: commits?.length, error });
+    isCurrentBranch() {
+        if (!this.branches || this.branches.length === 0) return false;
+        
+        // Find the current branch (the one with isCurrent: true)
+        const currentBranch = this.branches.find(branch => branch.isCurrent);
+        if (!currentBranch) return false;
+        
+        // Check if the selected branch is the current branch
+        return this.currentBranch === currentBranch.name;
+    }
+
+    selectUncommittedChanges() {
+        console.log('Selecting uncommitted changes');
+        this.selectedCommits.clear();
+        this.selectedCommits.add('uncommitted');
+        this.updateCommitSelection();
+        
+        // Show uncommitted changes in file panel
+        this.vscode.postMessage({
+            command: 'getUncommittedChanges'
+        });
+    }
+
+    commitChanges() {
+        const message = prompt('Enter commit message:');
+        if (message && message.trim()) {
+            this.vscode.postMessage({
+                command: 'commitChanges',
+                message: message.trim()
+            });
+        }
+    }
+
+    updateContent(branches, commits, error, hasUncommittedChanges = false) {
+        console.log('Updating content:', { 
+            branches: branches?.length, 
+            commits: commits?.length, 
+            error, 
+            hasUncommittedChanges,
+            currentBranch: this.currentBranch
+        });
         
         // Store branches for search filtering
         if (branches && branches.length > 0) {
             this.branches = branches;
+            // Find and log the current branch
+            const currentBranch = branches.find(b => b.isCurrent);
+            console.log('Current branch found:', currentBranch);
         }
+
+        // Store uncommitted changes state
+        this.hasUncommittedChanges = hasUncommittedChanges;
         
         // Update branches content
         const branchesContent = document.getElementById('branchesContent');
@@ -629,7 +688,44 @@ class PanelController {
     }
 
     generateCommitsHtml(commits, searchTerm = '', selectedUser = 'all') {
+        let html = '';
+
+        // Add uncommitted changes at the top if they exist and we're on the current branch
+        // If no branch is selected, we're viewing the current branch by default
+        const isOnCurrentBranch = !this.currentBranch || this.isCurrentBranch();
+        console.log('Uncommitted changes check:', {
+            hasUncommittedChanges: this.hasUncommittedChanges,
+            currentBranch: this.currentBranch,
+            isOnCurrentBranch: isOnCurrentBranch,
+            branches: this.branches?.map(b => ({ name: b.name, isCurrent: b.isCurrent }))
+        });
+        
+        if (this.hasUncommittedChanges && isOnCurrentBranch) {
+            html += `
+                <div class="commit-item uncommitted-changes" 
+                     onclick="selectUncommittedChanges()" 
+                     oncontextmenu="event.preventDefault(); showUncommittedChangesContextMenu(event)">
+                    <div class="commit-graph">
+                        <div class="dag-commit dag-uncommitted"></div>
+                    </div>
+                    <div class="commit-content">
+                        <div>
+                            <span class="commit-hash">📝</span>
+                            <span class="commit-message">Uncommitted Changes</span>
+                        </div>
+                        <div class="commit-meta">
+                            <span class="commit-author">Working Directory</span>
+                            <span class="commit-date">Now</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
         if (!commits || commits.length === 0) {
+            if (html) {
+                return html;
+            }
             return '<div class="empty-state"><h3>No commits found</h3></div>';
         }
 
@@ -1727,6 +1823,18 @@ function showPanelContextMenu(event, panelType) {
     
     // Show custom context menu for panel
     panelController.showContextMenu(event.clientX, event.clientY, 'panel', { panelType });
+}
+
+function selectUncommittedChanges() {
+    panelController.selectUncommittedChanges();
+}
+
+function showUncommittedChangesContextMenu(event) {
+    event.preventDefault();
+    const rect = event.target.getBoundingClientRect();
+    
+    // Show custom context menu for uncommitted changes
+    panelController.showContextMenu(event.clientX, event.clientY, 'uncommitted', {});
 }
 
 // Initialize when DOM is ready

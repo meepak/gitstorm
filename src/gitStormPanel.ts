@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { GitService, Branch, Commit, FileChange } from './gitService';
+import { GitService, Branch, Commit, FileChange } from './git/gitService';
 import { ContextMenuService } from './contextMenuService';
 import { getBranchesHtml, getCommitsHtml, getFilesHtml } from './helpers/uiHelpers';
 import * as fs from 'fs';
@@ -91,12 +91,17 @@ export class GitStormPanel {
                     return;
                 // Context menu actions are now handled directly in the webview
                 case 'getCommitDetails':
-                    console.log('Backend: Handling getCommitDetails for hash:', message.hash);
-                    await this._handleGetCommitDetails(message.hash);
+                    console.log('Backend: Handling getCommitDetails for hash:', message.commitHashes || message.hash);
+                    if (message.commitHashes && message.commitHashes.length > 1) {
+                        await this._handleGetMultiCommitFiles(message.commitHashes, message.compareAgainst, message.compareBranch);
+                    } else {
+                        const hash = message.commitHashes ? message.commitHashes[0] : message.hash;
+                        await this._handleGetCommitDetails(hash, message.compareAgainst, message.compareBranch);
+                    }
                     return;
                 case 'getMultiCommitFiles':
                     console.log('Backend: Handling getMultiCommitFiles for hashes:', message.hashes);
-                    await this._handleGetMultiCommitFiles(message.hashes);
+                    await this._handleGetMultiCommitFiles(message.hashes, message.compareAgainst, message.compareBranch);
                     return;
                 case 'showFileDiff':
                     await this._handleShowFileDiff(message.filePath, message.commitHash);
@@ -143,6 +148,15 @@ export class GitStormPanel {
                 case 'revertCommit':
                     await this._handleRevertCommit(message.commitHash);
                     return;
+                case 'getUncommittedChanges':
+                    await this._handleGetUncommittedChanges();
+                    return;
+                case 'commitChanges':
+                    await this._handleCommitChanges(message.message);
+                    return;
+                case 'openFile':
+                    await this._handleOpenFile(message.fileName);
+                    return;
             }
         }, null, this._disposables);
 
@@ -171,12 +185,23 @@ export class GitStormPanel {
             const commits = await this._gitService.getCommits(this._selectedBranch || undefined);
             console.log('Loaded commits:', commits);
 
+            // Check for uncommitted changes if we're on the current branch
+            let hasUncommittedChanges = false;
+            const currentBranch = await this._gitService.getCurrentBranch();
+            console.log('Current branch from git:', currentBranch, 'Selected branch:', this._selectedBranch);
+            
+            if (!this._selectedBranch || this._selectedBranch === currentBranch) {
+                hasUncommittedChanges = await this._gitService.hasUncommittedChanges();
+                console.log('Uncommitted changes detected:', hasUncommittedChanges);
+            }
+
             // Send data to WebView for content update
-            console.log('Sending data to WebView:', { branches: branches.length, commits: commits.length });
+            console.log('Sending data to WebView:', { branches: branches.length, commits: commits.length, hasUncommittedChanges });
             this._panel.webview.postMessage({
                 command: 'updateContent',
                 branches: branches,
                 commits: commits,
+                hasUncommittedChanges: hasUncommittedChanges,
                 error: null,
                 selectedBranch: this._selectedBranch,
                 panelSizes: this._panelSizes
@@ -203,12 +228,30 @@ export class GitStormPanel {
         // Load CSS
         const cssPath = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'src', 'styles', 'panel.css'));
         
-        // Load JS
-        const jsPath = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'src', 'webview', 'panel.js'));
+        // Load JS files
+        const jsFiles = [
+            'core/PanelController.js',
+            'handlers/MessageHandler.js', 
+            'handlers/ContextMenuHandler.js',
+            'renderers/BranchRenderer.js',
+            'renderers/CommitRenderer.js',
+            'renderers/FileChangesRenderer.js',
+            'renderers/FilterRenderer.js',
+            'renderers/IconRenderer.js',
+            'renderers/UIRenderer.js',
+            'managers/SearchManager.js',
+            'operations/GitOperations.js',
+            'globals.js'
+        ];
+        
+        const jsScripts = jsFiles.map(file => {
+            const jsPath = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'src', 'webview', file));
+            return `<script src="${jsPath}"></script>`;
+        }).join('\n    ');
 
         // Inject CSS and JS paths
         htmlContent = htmlContent.replace('<!-- CSS_PLACEHOLDER -->', `<link href="${cssPath}" rel="stylesheet">`);
-        htmlContent = htmlContent.replace('<!-- JS_PLACEHOLDER -->', `<script src="${jsPath}"></script>`);
+        htmlContent = htmlContent.replace('<!-- Load JavaScript modules in correct order -->', jsScripts);
         
         // Inject initial panel sizes
         htmlContent = htmlContent.replace('<!-- INITIAL_PANEL_SIZES_PLACEHOLDER -->', 
@@ -241,10 +284,22 @@ export class GitStormPanel {
         }
     }
 
-    private async _handleGetCommitDetails(hash: string) {
+    private async _handleGetCommitDetails(hash: string, compareAgainst?: string, compareBranch?: string) {
         try {
-            console.log('Getting commit details for:', hash);
-            const commit = await this._gitService.getCommitDetails(hash);
+            console.log('Getting commit details for:', hash, 'compareAgainst:', compareAgainst, 'compareBranch:', compareBranch);
+            
+            let commit;
+            if (compareAgainst === 'branch' && compareBranch) {
+                // Get commit details with branch comparison
+                commit = await this._gitService.getCommitDetailsWithCompare(hash, compareBranch);
+            } else if (compareAgainst === 'working') {
+                // Get commit details with working directory comparison
+                commit = await this._gitService.getCommitDetailsWithWorking(hash);
+            } else {
+                // Default: compare against previous commit
+                commit = await this._gitService.getCommitDetails(hash);
+            }
+            
             if (commit) {
                 console.log('Backend: Sending commitDetails with files:', commit.files?.length || 0);
                 this._panel.webview.postMessage({
@@ -270,10 +325,22 @@ export class GitStormPanel {
         }
     }
 
-    private async _handleGetMultiCommitFiles(hashes: string[]) {
+    private async _handleGetMultiCommitFiles(hashes: string[], compareAgainst?: string, compareBranch?: string) {
         try {
-            // console.log('Getting multi-commit files for:', hashes);
-            const files = await this._gitService.getMultiCommitFiles(hashes);
+            console.log('Getting multi-commit files for:', hashes, 'compareAgainst:', compareAgainst, 'compareBranch:', compareBranch);
+            
+            let files;
+            if (compareAgainst === 'branch' && compareBranch) {
+                // Get multi-commit files with branch comparison
+                files = await this._gitService.getMultiCommitFilesWithCompare(hashes, compareBranch);
+            } else if (compareAgainst === 'working') {
+                // Get multi-commit files with working directory comparison
+                files = await this._gitService.getMultiCommitFilesWithWorking(hashes);
+            } else {
+                // Default: compare against previous commits
+                files = await this._gitService.getMultiCommitFiles(hashes);
+            }
+            
             this._panel.webview.postMessage({
                 command: 'multiCommitFiles',
                 files: files
@@ -290,101 +357,34 @@ export class GitStormPanel {
     
      private async _handleShowFileDiff(filePath: string, commitHash?: string, parentIndex = 1) {
        try {
-         const ws = vscode.workspace.workspaceFolders?.[0];
-         if (!ws) {
-           vscode.window.showErrorMessage('No workspace folder found');
-           return;
-         }
-     
-         const fileUri = vscode.Uri.joinPath(ws.uri, filePath);
-     
+         let diffContent = '';
+         
          if (commitHash) {
            // Show diff between commit and its parent
-           try {
-             // Get the diff content using our git service
-             const diffContent = await this._gitService.getFileDiff(commitHash, filePath);
-             
-             if (!diffContent || diffContent.trim() === '') {
-               vscode.window.showInformationMessage(`No changes found for ${filePath} in commit ${commitHash.substring(0, 7)}`);
-               return;
-             }
-             
-             // Try to use VS Code's built-in diff viewer with temporary files
-             try {
-               // Get the file content at the commit and its parent
-               const [commitContent, parentContent] = await Promise.all([
-                 this._gitService.getFileContentAtCommit(commitHash, filePath),
-                 this._gitService.getFileContentAtCommit(`${commitHash}~1`, filePath)
-               ]);
-               
-               // Create temporary documents for the diff
-               const commitDoc = await vscode.workspace.openTextDocument({
-                 content: commitContent || '',
-                 language: this._getLanguageFromFile(filePath)
-               });
-               
-               const parentDoc = await vscode.workspace.openTextDocument({
-                 content: parentContent || '',
-                 language: this._getLanguageFromFile(filePath)
-               });
-               
-               // Show the diff using VS Code's built-in diff viewer in read-only mode
-               await vscode.commands.executeCommand(
-                 'vscode.diff',
-                 parentDoc.uri,
-                 commitDoc.uri,
-                 `${filePath} (${commitHash.substring(0, 7)})`,
-                 {
-                   viewColumn: vscode.ViewColumn.Beside,
-                   preview: true
-                 }
-               );
-               
-               vscode.window.setStatusBarMessage(`Showing diff for ${filePath} (${commitHash.substring(0, 7)})`, 5000);
-               
-             } catch (diffError) {
-               console.warn('Built-in diff failed, falling back to text diff:', diffError);
-               
-               // Fallback: Show diff content in a text document
-               const diffDocument = await vscode.workspace.openTextDocument({
-                 content: diffContent,
-                 language: 'diff'
-               });
-               
-               // Show the diff document in read-only mode
-               await vscode.window.showTextDocument(diffDocument, {
-                 viewColumn: vscode.ViewColumn.Beside,
-                 preview: true
-               });
-               
-               vscode.window.setStatusBarMessage(`Diff for ${filePath} (${commitHash.substring(0, 7)})`, 5000);
-             }
-           } catch (error) {
-             console.error('Error showing file diff:', error);
-             vscode.window.showErrorMessage(`Failed to show file diff: ${String(error)}`);
-           }
+           diffContent = await this._gitService.getFileDiff(commitHash, filePath);
            
+           if (!diffContent || diffContent.trim() === '') {
+             vscode.window.showInformationMessage(`No changes found for ${filePath} in commit ${commitHash.substring(0, 7)}`);
+             return;
+           }
          } else {
-           // Show current working directory changes using Git extension
-           try {
-             // First try to use the built-in git diff command
-             await vscode.commands.executeCommand(
-               'git.openChange',
-               fileUri
-             );
-           } catch (gitError) {
-             console.warn('Git extension command failed, trying alternative approach:', gitError);
-             
-             // Alternative: try to show the file in the source control view
-             try {
-               await vscode.commands.executeCommand('workbench.view.scm');
-               // The file should be highlighted in the SCM view
-             } catch (scmError) {
-               console.error('Failed to show file in SCM view:', scmError);
-               vscode.window.showErrorMessage(`Failed to show file changes for ${filePath}`);
-             }
+           // Show current working directory changes
+           diffContent = await this._gitService.getFileDiff('HEAD', filePath);
+           
+           if (!diffContent || diffContent.trim() === '') {
+             vscode.window.showInformationMessage(`No changes found for ${filePath} in working directory`);
+             return;
            }
          }
+         
+         // Send the diff content to the webview instead of creating temporary files
+         this._panel.webview.postMessage({
+           command: 'updateFileDiff',
+           file: filePath,
+           diff: diffContent
+         });
+         
+         vscode.window.setStatusBarMessage(`Showing diff for ${filePath}`, 5000);
          
        } catch (err) {
          console.error('Error showing file diff:', err);
@@ -1095,6 +1095,45 @@ export class GitStormPanel {
             } catch (error) {
                 vscode.window.showErrorMessage(`Error reverting commit: ${error}`);
             }
+        }
+    }
+
+    private async _handleGetUncommittedChanges(): Promise<void> {
+        try {
+            const files = await this._gitService.getUncommittedChanges();
+            this._panel.webview.postMessage({
+                command: 'commitDetails',
+                commit: null,
+                files: files
+            });
+        } catch (error) {
+            console.error('Error getting uncommitted changes:', error);
+            vscode.window.showErrorMessage(`Failed to get uncommitted changes: ${error}`);
+        }
+    }
+
+    private async _handleCommitChanges(message: string): Promise<void> {
+        try {
+            const success = await this._gitService.commitChanges(message);
+            if (success) {
+                vscode.window.showInformationMessage(`Committed changes: ${message}`);
+                await this.refresh();
+            } else {
+                vscode.window.showErrorMessage(`Failed to commit changes`);
+            }
+        } catch (error) {
+            console.error('Error committing changes:', error);
+            vscode.window.showErrorMessage(`Error committing changes: ${error}`);
+        }
+    }
+
+    private async _handleOpenFile(fileName: string): Promise<void> {
+        try {
+            const document = await vscode.workspace.openTextDocument(fileName);
+            await vscode.window.showTextDocument(document);
+        } catch (error) {
+            console.error('Error opening file:', error);
+            vscode.window.showErrorMessage(`Error opening file: ${error}`);
         }
     }
 

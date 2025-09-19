@@ -28,8 +28,10 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
+    "compile": "npm run compile:ts && npm run copy:webview",
+    "compile:ts": "tsc -p ./",
+    "copy:webview": "mkdir -p out/webview/renderers out/webview/handlers out/webview/managers out/webview/operations out/webview/core out/templates out/styles && cp -r src/webview/* out/webview/ && cp src/templates/* out/templates/ && cp src/styles/* out/styles/",
+    "watch": "npm run copy:webview && tsc -watch -p ./"
   },
   "devDependencies": {
     "@types/vscode": "^1.74.0",

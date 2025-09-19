@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { GitService, Branch, Commit } from './gitService';
+import { GitService, Branch, Commit } from './git/gitService';
 
 export class ContextMenuService {
     private _gitService: GitService;

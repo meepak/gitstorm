@@ -1,0 +1,97 @@
+// Branch Renderer - Handles branch-related HTML generation
+class BranchRenderer {
+    constructor(panelController) {
+        this.panel = panelController;
+    }
+
+    generateBranchesHtml(branches, selectedBranch, searchTerm = '') {
+        if (!branches || branches.length === 0) {
+            return '<div class="empty-state"><h3>No branches found</h3></div>';
+        }
+
+        // Filter branches based on search term
+        let filteredBranches = branches;
+        if (searchTerm.length > 0) {
+            filteredBranches = branches.filter(branch => 
+                branch.name.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+
+        // Separate local and remote branches
+        const localBranches = filteredBranches.filter(branch => !branch.isRemote);
+        const remoteBranches = filteredBranches.filter(branch => branch.isRemote);
+
+        // Group remote branches by origin
+        const remoteGroups = {};
+        remoteBranches.forEach(branch => {
+            const origin = branch.name.split('/')[0];
+            if (!remoteGroups[origin]) {
+                remoteGroups[origin] = [];
+            }
+            remoteGroups[origin].push(branch);
+        });
+
+        let html = '';
+
+        // Local branches section
+        if (localBranches.length > 0) {
+            html += `
+                <div class="tree-section">
+                    <div class="tree-section-header">
+                        <div class="tree-section-title">Local</div>
+                    </div>
+                    <div class="tree-section-content" id="local-content">
+                        ${this.generateBranchItemsHtml(localBranches, selectedBranch)}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Remote branches sections
+        Object.keys(remoteGroups).sort().forEach(origin => {
+            const originBranches = remoteGroups[origin];
+            html += `
+                <div class="tree-section">
+                    <div class="tree-section-header">
+                        <div class="tree-section-subtitle">${origin}</div>
+                    </div>
+                    <div class="tree-section-content" id="${origin}-content">
+                        ${this.generateBranchItemsHtml(originBranches, selectedBranch)}
+                    </div>
+                </div>
+            `;
+        });
+
+        // If we have a search term but no results in any section, show message
+        if (searchTerm.length > 0 && localBranches.length === 0 && Object.keys(remoteGroups).length === 0) {
+            html = `<div class="empty-state"><h3>No branches match "${searchTerm}"</h3></div>`;
+        }
+
+        return html;
+    }
+
+    generateBranchItemsHtml(branches, selectedBranch) {
+        return branches.map(branch => {
+            const isSelected = (selectedBranch && branch.name === selectedBranch);
+            const isCurrent = branch.isCurrent;
+            const highlightClass = isSelected ? 'selected' : '';
+            const currentClass = isCurrent ? 'current' : '';
+            const typeIcon = branch.isRemote ? '🌐' : '🌿';
+            const refs = branch.ahead || branch.behind ? 
+                `+${branch.ahead || 0} -${branch.behind || 0}` : '';
+
+            // For remote branches, show only the branch name without origin
+            const displayName = branch.isRemote ? branch.name.split('/').slice(1).join('/') : branch.name;
+
+            return `
+                <div class="branch-item ${highlightClass} ${currentClass}" 
+                     onclick="selectBranch('${branch.name}')" 
+                     oncontextmenu="event.preventDefault(); showBranchContextMenu(event, '${branch.name}')">
+                    <div class="branch-icon">${typeIcon}</div>
+                    <div class="branch-name">${displayName}</div>
+                    <div class="branch-refs">${refs}</div>
+                </div>
+            `;
+        }).join('');
+    }
+}

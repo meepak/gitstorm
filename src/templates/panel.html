@@ -12,12 +12,12 @@
     </div>
     
     <div class="main-content">
-        <div class="panel branches-panel">
+        <div id="branchesPanel" class="panel branches-panel">
             <div class="panel-header" oncontextmenu="event.preventDefault(); showPanelContextMenu(event, 'branches')">
                 <span>Branches</span>
                 <div class="search-container">
-                    <input type="text" placeholder="Search branches..." />
-                    <button class="clear-search" onclick="clearSearch()" title="Clear search">×</button>
+                    <input type="text" id="branchesSearch" placeholder="Search branches..." />
+                    <button class="clear-search" onclick="clearBranchesSearch()" title="Clear search">×</button>
                 </div>
             </div>
             <div class="panel-content">
@@ -25,27 +25,27 @@
                     <div class="loading">Loading branches...</div>
                 </div>
             </div>
-            <div class="resize-handle" data-panel="branches"></div>
+            <div id="resizeBranches" class="resize-handle" data-panel="branches"></div>
         </div>
         
-        <div class="panel commits-panel">
+        <div id="commitsPanel" class="panel commits-panel">
             <div class="panel-header" oncontextmenu="event.preventDefault(); showPanelContextMenu(event, 'commits')">
                 <span>Commits</span>
                 <div class="search-container">
-                    <input type="text" placeholder="Search commits..." />
+                    <input type="text" id="commitsSearch" placeholder="Search commits..." />
                     <button class="clear-search" onclick="clearCommitsSearch()" title="Clear search">×</button>
                 </div>
             </div>
             <div class="panel-content">
                 <div class="commits-header">
                     <div class="commits-filters">
-                        <select class="user-filter" onchange="filterByUser(this.value)">
-                            <option value="all">All</option>
+                        <select id="userFilter" class="user-filter">
+                            <option value="all">All Authors</option>
                         </select>
                         <div class="commits-compare">
                             <span class="compare-icon">🔄</span>
-                            <select class="compare-select" onchange="changeCommitsCompareOption(this.value)">
-                                <option value="none">None</option>
+                            <select id="commitsCompareFilter" class="compare-select">
+                                <option value="none">Compare with...</option>
                             </select>
                         </div>
                     </div>
@@ -56,16 +56,29 @@
                     </div>
                 </div>
             </div>
-            <div class="resize-handle" data-panel="commits"></div>
+            <div id="resizeCommits" class="resize-handle" data-panel="commits"></div>
         </div>
         
-        <div class="panel files-panel">
+        <div id="filesPanel" class="panel files-panel">
             <div class="panel-header" oncontextmenu="event.preventDefault(); showPanelContextMenu(event, 'files')">File Changes</div>
             <div class="panel-content">
                 <div id="filesContent">
                     <div class="empty-state">
                         <h3>No selection</h3>
-                        <p>Select a commit to view file changes</p>
+                        <p>Select a commit to view file changes, or <a href="#" onclick="showWorkingDirectoryChanges()">view working directory changes</a></p>
+                    </div>
+                </div>
+            </div>
+            <div id="resizeFiles" class="resize-handle" data-panel="files"></div>
+        </div>
+        
+        <div class="panel diff-panel">
+            <div class="panel-header" oncontextmenu="event.preventDefault(); showPanelContextMenu(event, 'diff')">Diff Viewer</div>
+            <div class="panel-content">
+                <div id="diffContent">
+                    <div class="empty-state">
+                        <h3>No diff selected</h3>
+                        <p>Click on a file to view its changes</p>
                     </div>
                 </div>
             </div>
@@ -129,6 +142,10 @@
             <span class="context-menu-icon">🗜️</span>
             <span class="context-menu-text">Squash Commits</span>
         </div>
+        <div class="context-menu-item" data-action="commit">
+            <span class="context-menu-icon">💾</span>
+            <span class="context-menu-text">Commit Changes</span>
+        </div>
         
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="refresh">
@@ -137,7 +154,20 @@
         </div>
     </div>
     
-    <!-- JS_PLACEHOLDER -->
+    <!-- Load JavaScript modules in correct order -->
+    <script src="core/PanelController.js"></script>
+    <script src="handlers/MessageHandler.js"></script>
+    <script src="handlers/ContextMenuHandler.js"></script>
+    <script src="renderers/BranchRenderer.js"></script>
+    <script src="renderers/CommitRenderer.js"></script>
+    <script src="renderers/FileChangesRenderer.js"></script>
+    <script src="renderers/FilterRenderer.js"></script>
+    <script src="renderers/IconRenderer.js"></script>
+    <script src="renderers/UIRenderer.js"></script>
+    <script src="managers/SearchManager.js"></script>
+    <script src="operations/GitOperations.js"></script>
+    <script src="globals.js"></script>
+    
     <!-- INITIAL_PANEL_SIZES_PLACEHOLDER -->
 </body>
 </html>
