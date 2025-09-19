@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { GitService } from './git/gitService';
-import { GitStormPanel } from './gitStormPanel';
+import { GitStormPanel } from './panel';
 
 let gitService: GitService;
 
