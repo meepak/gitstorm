@@ -41,11 +41,14 @@ class FileChangesRenderer {
         let commitHash = '';
         if (commit) {
             commitHash = commit.hash;
+            console.log('🚀🚀🚀 FileChangesRenderer: Using commit hash from commit object:', commitHash, 'commit object:', commit);
         } else if (comparison) {
             commitHash = 'comparison';
         } else {
             commitHash = 'uncommitted';
         }
+        
+        console.log('🚀🚀🚀 FileChangesRenderer: Final commitHash for file clicks:', commitHash);
 
         return this.renderTreeNodes(tree, commitHash, '');
     }
@@ -112,7 +115,7 @@ class FileChangesRenderer {
                 html += `
                     <div class="file-tree-item file ${statusClass}" 
                          data-file-path="${node.file}"
-                         onclick="selectFile('${node.file}', '${commitHash}')" 
+                         onclick="console.log('🚀🚀🚀 File click handler called for:', '${node.file}', 'commit:', '${commitHash}', 'compare against:', '${this.panel.compareAgainst}'); console.log('🚀🚀🚀 selectFile function exists:', typeof selectFile); selectFile('${node.file}', '${commitHash}', '${this.panel.compareAgainst}')" 
                          oncontextmenu="event.preventDefault(); selectFileOnly('${node.file}'); showFileContextMenu(event, '${node.file}', '${commitHash}')">
                         <div class="file-tree-icon">${fileTypeIcon}</div>
                         <div class="file-tree-name">

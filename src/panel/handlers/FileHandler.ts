@@ -5,16 +5,31 @@ import { GitStormPanel } from '../core/GitStormPanel';
 export class FileHandler {
     constructor(private readonly panel: GitStormPanel) {}
 
-    async handleShowFileDiff(filePath: string, commitHash?: string, parentIndex = 1) {
+    async handleShowFileDiff(filePath: string, commitHash?: string, parentIndex = 1, compareAgainst?: string, compareBranch?: string) {
         try {
-            console.log('Showing file diff for:', filePath, 'commit:', commitHash, 'parentIndex:', parentIndex);
+            console.log('🚀🚀🚀 UPDATED FileHandler.handleShowFileDiff called for:', filePath, 'commit:', commitHash, 'compareAgainst:', compareAgainst, 'compareBranch:', compareBranch);
+            console.log('🚀🚀🚀 All parameters received:', { filePath, commitHash, parentIndex, compareAgainst, compareBranch });
             
+            // Route to appropriate method based on comparison mode
+            if (compareAgainst === 'working' && commitHash) {
+                await this.handleShowFileDiffWithWorking(filePath, commitHash);
+                return;
+            } else if (compareAgainst === 'branch' && commitHash) {
+                await this.handleShowFileDiffWithBranch(filePath, commitHash, compareBranch);
+                return;
+            }
+            
+            // Default: compare against previous commit
             let diff;
             if (commitHash) {
+                console.log('Getting diff for commit:', commitHash, 'file:', filePath);
                 diff = await this.panel.gitService.getFileDiff(commitHash, filePath);
+                console.log('Diff result length:', diff ? diff.length : 'null/undefined');
             } else {
                 // Show working directory diff
+                console.log('Getting working directory diff for file:', filePath);
                 diff = await this.panel.gitService.getFileDiff('HEAD', filePath);
+                console.log('Working diff result length:', diff ? diff.length : 'null/undefined');
             }
             
             this.panel.panel.webview.postMessage({
@@ -88,6 +103,112 @@ export class FileHandler {
             this.panel.panel.webview.postMessage({
                 command: 'error',
                 error: error instanceof Error ? error.message : 'Failed to show file diff with compare'
+            });
+        }
+    }
+
+    async handleShowFileDiffWithWorking(filePath: string, commitHash: string) {
+        try {
+            console.log('🚀🚀🚀 UPDATED FileHandler.handleShowFileDiffWithWorking called for:', filePath, 'commit:', commitHash);
+            
+            // Check if file exists in both the commit and the working directory
+            const fileExistsInCommit = await this.panel.gitService.fileExistsAtCommit(commitHash, filePath);
+            const fileExistsInWorking = await this.panel.gitService.fileExistsAtCommit('HEAD', filePath);
+            
+            console.log('File exists in commit:', fileExistsInCommit, 'File exists in working directory:', fileExistsInWorking);
+            
+            if (!fileExistsInCommit && !fileExistsInWorking) {
+                // File doesn't exist in either, show empty diff
+                this.panel.panel.webview.postMessage({
+                    command: 'updateFileDiff',
+                    file: filePath,
+                    diff: ''
+                });
+                return;
+            }
+            
+            // Get diff between commit and working directory
+            const diff = await this.panel.gitService.getFileDiffRange(`${commitHash}..HEAD`, filePath);
+            console.log('Working directory diff result length:', diff ? diff.length : 'null/undefined');
+            
+            this.panel.panel.webview.postMessage({
+                command: 'updateFileDiff',
+                file: filePath,
+                diff: diff
+            });
+        } catch (error) {
+            console.error('Error showing file diff with working directory:', error);
+            this.panel.panel.webview.postMessage({
+                command: 'error',
+                error: error instanceof Error ? error.message : 'Failed to show file diff with working directory'
+            });
+        }
+    }
+
+    async handleShowFileDiffWithBranch(filePath: string, commitHash: string, compareBranch?: string) {
+        try {
+            console.log('🚀🚀🚀 UPDATED FileHandler.handleShowFileDiffWithBranch called for:', filePath, 'commit:', commitHash, 'compareBranch:', compareBranch);
+            
+            // Use the specified compare branch, or default to current branch
+            const branchForComparison = compareBranch || await this.panel.gitService.getCurrentBranch();
+            console.log('Branch for comparison:', branchForComparison);
+            
+            // Check if file exists in both the commit and the comparison branch
+            const fileExistsInCommit = await this.panel.gitService.fileExistsAtCommit(commitHash, filePath);
+            const fileExistsInBranch = await this.panel.gitService.fileExistsAtCommit(branchForComparison, filePath);
+            
+            console.log('File exists in commit:', fileExistsInCommit, 'File exists in branch:', fileExistsInBranch);
+            
+            if (!fileExistsInCommit && !fileExistsInBranch) {
+                // File doesn't exist in either, show empty diff
+                this.panel.panel.webview.postMessage({
+                    command: 'updateFileDiff',
+                    file: filePath,
+                    diff: ''
+                });
+                return;
+            }
+            
+            if (!fileExistsInCommit) {
+                // File was added in the branch, show as new file
+                const diff = await this.panel.gitService.getFileDiffRange(`${branchForComparison}..${commitHash}`, filePath);
+                console.log('Branch diff result length (file added):', diff ? diff.length : 'null/undefined');
+                
+                this.panel.panel.webview.postMessage({
+                    command: 'updateFileDiff',
+                    file: filePath,
+                    diff: diff
+                });
+                return;
+            }
+            
+            if (!fileExistsInBranch) {
+                // File was deleted in the branch, show as deleted file
+                const diff = await this.panel.gitService.getFileDiffRange(`${branchForComparison}..${commitHash}`, filePath);
+                console.log('Branch diff result length (file deleted):', diff ? diff.length : 'null/undefined');
+                
+                this.panel.panel.webview.postMessage({
+                    command: 'updateFileDiff',
+                    file: filePath,
+                    diff: diff
+                });
+                return;
+            }
+            
+            // File exists in both, get normal diff
+            const diff = await this.panel.gitService.getFileDiffRange(`${branchForComparison}..${commitHash}`, filePath);
+            console.log('Branch diff result length (file exists in both):', diff ? diff.length : 'null/undefined');
+            
+            this.panel.panel.webview.postMessage({
+                command: 'updateFileDiff',
+                file: filePath,
+                diff: diff
+            });
+        } catch (error) {
+            console.error('Error showing file diff with branch:', error);
+            this.panel.panel.webview.postMessage({
+                command: 'error',
+                error: error instanceof Error ? error.message : 'Failed to show file diff with branch'
             });
         }
     }

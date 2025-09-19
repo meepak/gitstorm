@@ -94,6 +94,10 @@ export class CommitOperations {
             const commits: Commit[] = [];
 
             console.log(`Found ${log.all.length} commits in range ${range}`);
+            console.log('🚀🚀🚀 CommitOperations.getCommitsExcludingBranch: Retrieved commits:', log.all?.length || 0);
+            if (log.all && log.all.length > 0) {
+                console.log('🚀🚀🚀 First commit hash:', log.all[0].hash);
+            }
 
             for (const commit of log.all) {
                 commits.push({
@@ -138,38 +142,54 @@ export class CommitOperations {
 
     async getCommitDetails(hash: string): Promise<Commit | null> {
         try {
-            const log = await this.git.log({
-                from: hash,
-                maxCount: 1,
-                format: {
-                    hash: '%H',
-                    author_name: '%an',
-                    date: '%ci',
-                    message: '%s',
-                    parent: '%P',
-                    refs: '%D'
-                }
-            });
-
-            if (log.all && log.all.length > 0) {
-                const commit = log.all[0];
-                
-                // Get file changes for this commit using --numstat for better parsing
-                const showOutput = await this.git.show([hash, '--numstat']);
-                const files = GitParsers.parseFileChanges(showOutput);
-
-                return {
-                    hash: commit.hash,
-                    shortHash: commit.hash.substring(0, 7),
-                    message: commit.message,
-                    author: commit.author_name,
-                    date: new Date(commit.date),
-                    parents: (commit as any).parent ? (commit as any).parent.split(' ').filter((p: string) => p.trim()) : [],
-                    refs: GitParsers.parseRefs(commit.refs || ''),
-                    files: files
-                };
+            console.log('🚀🚀🚀 CommitOperations.getCommitDetails called with hash:', hash);
+            
+            const log = await this.git.raw(['log', '--max-count=1', '--format=%H|%an|%ci|%s|%P|%D', hash]);
+            
+            if (!log || log.trim() === '') {
+                console.log('🚀🚀🚀 CommitOperations: No commit found for hash:', hash);
+                return null;
             }
-            return null;
+            
+            const lines = log.trim().split('\n');
+            const commitLine = lines[0];
+            const parts = commitLine.split('|');
+            
+            const commit = {
+                hash: parts[0],
+                author_name: parts[1],
+                date: parts[2],
+                message: parts[3],
+                parent: parts[4],
+                refs: parts[5] || ''
+            };
+            
+            console.log('🚀🚀🚀 CommitOperations: Retrieved commit from git log:', commit.hash, 'message:', commit.message);
+            
+            // Validate that the returned commit matches the requested hash
+            if (commit.hash !== hash) {
+                console.error('🚀🚀🚀 CommitOperations: Hash mismatch! Requested:', hash, 'but got:', commit.hash);
+                console.error('🚀🚀🚀 This usually means the requested commit does not exist in the repository');
+                return null;
+            }
+            
+            // Get file changes for this commit using --numstat for better parsing
+            const showOutput = await this.git.show([hash, '--numstat']);
+            const files = GitParsers.parseFileChanges(showOutput);
+
+            const result = {
+                hash: commit.hash,
+                shortHash: commit.hash.substring(0, 7),
+                message: commit.message,
+                author: commit.author_name,
+                date: new Date(commit.date),
+                parents: commit.parent ? commit.parent.split(' ').filter((p: string) => p.trim()) : [],
+                refs: GitParsers.parseRefs(commit.refs || ''),
+                files: files
+            };
+            
+            console.log('🚀🚀🚀 CommitOperations: Returning commit object with hash:', result.hash);
+            return result;
         } catch (error) {
             console.error('Error getting commit details:', error);
             return null;

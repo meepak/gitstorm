@@ -9,10 +9,45 @@ export class FileOperations {
         try {
             if (file) {
                 // Show diff between commit and its parent for specific file
-                return await this.git.diff([`${hash}~1..${hash}`, '--', file]);
+                console.log('🚀🚀🚀 UPDATED FileOperations.getFileDiff called for file:', file, 'hash:', hash);
+                
+                // First try the standard approach
+                let diff = await this.git.diff([`${hash}~1..${hash}`, '--', file]);
+                console.log('FileOperations: Standard diff result length:', diff ? diff.length : 'null/undefined');
+                
+                // If diff is empty, try alternative approaches for merge commits
+                if (!diff || diff.trim() === '') {
+                    console.log('FileOperations: Standard diff empty, trying merge commit approaches');
+                    
+                    // Try comparing with the merge base
+                    try {
+                        const mergeBase = await this.git.raw(['merge-base', `${hash}~1`, `${hash}~2`]);
+                        if (mergeBase && mergeBase.trim()) {
+                            diff = await this.git.diff([`${mergeBase.trim()}..${hash}`, '--', file]);
+                            console.log('FileOperations: Merge base diff result length:', diff ? diff.length : 'null/undefined');
+                        }
+                    } catch (mergeBaseError) {
+                        console.log('FileOperations: Merge base approach failed:', mergeBaseError);
+                    }
+                    
+                    // If still empty, try comparing with the first parent
+                    if (!diff || diff.trim() === '') {
+                        try {
+                            diff = await this.git.diff([`${hash}~1`, `${hash}`, '--', file]);
+                            console.log('FileOperations: First parent diff result length:', diff ? diff.length : 'null/undefined');
+                        } catch (parentError) {
+                            console.log('FileOperations: First parent approach failed:', parentError);
+                        }
+                    }
+                }
+                
+                return diff;
             } else {
                 // Show diff for the entire commit
-                return await this.git.diff([`${hash}~1..${hash}`]);
+                console.log('FileOperations: Getting diff for entire commit:', hash);
+                const diff = await this.git.diff([`${hash}~1..${hash}`]);
+                console.log('FileOperations: Full diff result length:', diff ? diff.length : 'null/undefined');
+                return diff;
             }
         } catch (error) {
             console.error('Error getting file diff:', error);
@@ -39,6 +74,20 @@ export class FileOperations {
         } catch (error) {
             console.error(`Error getting file content at commit ${hash} for ${filePath}:`, error);
             return '';
+        }
+    }
+
+    async fileExistsAtCommit(hash: string, filePath: string): Promise<boolean> {
+        try {
+            console.log('🚀🚀🚀 FileOperations.fileExistsAtCommit checking:', hash, filePath);
+            // Use git cat-file to check if the file exists at the commit
+            await this.git.raw(['cat-file', '-e', `${hash}:${filePath}`]);
+            console.log('🚀🚀🚀 FileOperations.fileExistsAtCommit: File exists at commit:', filePath);
+            return true;
+        } catch (error) {
+            console.log('🚀🚀🚀 FileOperations.fileExistsAtCommit: File does not exist at commit:', filePath, 'error:', error);
+            // If git cat-file fails, the file doesn't exist
+            return false;
         }
     }
 
@@ -93,10 +142,14 @@ export class FileOperations {
 
     async getCommitDetailsWithCompare(hash: string, compareBranch: string): Promise<{ commit: any; files: FileChange[] } | null> {
         try {
+            console.log('🚀🚀🚀 FileOperations.getCommitDetailsWithCompare called with hash:', hash, 'compareBranch:', compareBranch);
+            
             const [commit, files] = await Promise.all([
                 this.getCommitDetails(hash),
                 this.getFileChangesWithCompare(hash, compareBranch)
             ]);
+            
+            console.log('🚀🚀🚀 FileOperations: Retrieved commit with hash:', commit?.hash, 'files count:', files?.length);
             
             return { commit, files };
         } catch (error) {
@@ -189,32 +242,42 @@ export class FileOperations {
     // Helper method for getCommitDetails (used by other methods)
     private async getCommitDetails(hash: string): Promise<any> {
         try {
-            const log = await this.git.log({
-                from: hash,
-                maxCount: 1,
-                format: {
-                    hash: '%H',
-                    author_name: '%an',
-                    date: '%ci',
-                    message: '%s',
-                    parent: '%P',
-                    refs: '%D'
-                }
-            });
-
-            if (log.all && log.all.length > 0) {
-                const commit = log.all[0];
-                return {
-                    hash: commit.hash,
-                    shortHash: commit.hash.substring(0, 7),
-                    message: commit.message,
-                    author: commit.author_name,
-                    date: new Date(commit.date),
-                    parents: (commit as any).parent ? (commit as any).parent.split(' ').filter((p: string) => p.trim()) : [],
-                    refs: GitParsers.parseRefs(commit.refs || '')
-                };
+            const log = await this.git.raw(['log', '--max-count=1', '--format=%H|%an|%ci|%s|%P|%D', hash]);
+            
+            if (!log || log.trim() === '') {
+                console.log('🚀🚀🚀 FileOperations: No commit found for hash:', hash);
+                return null;
             }
-            return null;
+            
+            const lines = log.trim().split('\n');
+            const commitLine = lines[0];
+            const parts = commitLine.split('|');
+            
+            const commit = {
+                hash: parts[0],
+                author_name: parts[1],
+                date: parts[2],
+                message: parts[3],
+                parent: parts[4],
+                refs: parts[5] || ''
+            };
+            
+            // Validate that the returned commit matches the requested hash
+            if (commit.hash !== hash) {
+                console.error('🚀🚀🚀 FileOperations: Hash mismatch! Requested:', hash, 'but got:', commit.hash);
+                console.error('🚀🚀🚀 This usually means the requested commit does not exist in the repository');
+                return null;
+            }
+            
+            return {
+                hash: commit.hash,
+                shortHash: commit.hash.substring(0, 7),
+                message: commit.message,
+                author: commit.author_name,
+                date: new Date(commit.date),
+                parents: commit.parent ? commit.parent.split(' ').filter((p: string) => p.trim()) : [],
+                refs: GitParsers.parseRefs(commit.refs || '')
+            };
         } catch (error) {
             console.error('Error getting commit details:', error);
             return null;

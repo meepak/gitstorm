@@ -1,4 +1,6 @@
 // Git Operations - Handles all Git-related operations and file operations
+console.log('🚀🚀🚀 UPDATED GitOperations.js loaded at:', new Date().toISOString());
+
 class GitOperations {
     constructor(panelController) {
         this.panel = panelController;
@@ -39,7 +41,9 @@ class GitOperations {
     showFileDiff(fileName, commitHash) {
         this.panel.messageHandler.sendMessage('showFileDiff', { 
             filePath: fileName, 
-            commitHash 
+            commitHash,
+            compareAgainst: this.panel.compareAgainst || 'previous',
+            compareBranch: this.panel.selectedCompareBranch || null
         });
     }
 
@@ -68,6 +72,22 @@ class GitOperations {
         this.panel.messageHandler.sendMessage('showFileDiffWithCompare', {
             filePath: filePath,
             compareData: compareData
+        });
+    }
+
+    showFileDiffWithWorking(fileName, commitHash) {
+        console.log('Show file diff with working directory:', fileName, 'commit:', commitHash);
+        this.panel.messageHandler.sendMessage('showFileDiffWithWorking', {
+            filePath: fileName,
+            commitHash: commitHash
+        });
+    }
+
+    showFileDiffWithBranch(fileName, commitHash) {
+        console.log('Show file diff with branch:', fileName, 'commit:', commitHash);
+        this.panel.messageHandler.sendMessage('showFileDiffWithBranch', {
+            filePath: fileName,
+            commitHash: commitHash
         });
     }
 
@@ -274,22 +294,31 @@ class GitOperations {
     }
 
     // File selection
-    selectFile(fileName, commitHash) {
-        console.log('Selecting file:', fileName, 'for commit:', commitHash);
+    selectFile(fileName, commitHash, compareAgainst = 'previous') {
+        console.log('🚀🚀🚀 UPDATED selectFile called with:', fileName, 'commit:', commitHash, 'compare against:', compareAgainst);
         this.panel.selectedFileId = fileName;
         
         // Update file selection highlighting
         this.updateFileSelectionHighlighting(fileName);
 
-        // Show file diff
-        if (commitHash && commitHash !== 'uncommitted' && commitHash !== 'comparison') {
-            this.showFileDiff(fileName, commitHash);
-        } else if (commitHash === 'uncommitted') {
-            // For uncommitted changes, show the diff
-            this.showFileDiff(fileName, null);
-        } else if (commitHash === 'comparison') {
-            // For comparison, show the diff
-            this.showFileDiff(fileName, 'comparison');
+        // Show file diff based on comparison mode
+        if (compareAgainst === 'working') {
+            // For working directory comparison, show diff between commit and working directory
+            this.showFileDiffWithWorking(fileName, commitHash);
+        } else if (compareAgainst === 'branch') {
+            // For branch comparison, show diff between commit and branch
+            this.showFileDiffWithBranch(fileName, commitHash);
+        } else {
+            // Default: compare against previous commit
+            if (commitHash && commitHash !== 'uncommitted' && commitHash !== 'comparison') {
+                this.showFileDiff(fileName, commitHash);
+            } else if (commitHash === 'uncommitted') {
+                // For uncommitted changes, show the diff
+                this.showFileDiff(fileName, null);
+            } else if (commitHash === 'comparison') {
+                // For comparison, show the diff
+                this.showFileDiff(fileName, 'comparison');
+            }
         }
     }
 
@@ -305,16 +334,23 @@ class GitOperations {
         console.log('Updating file selection highlighting for:', fileName);
         // Update file selection highlighting
         const fileItems = document.querySelectorAll('.file-tree-item.file');
+        let found = false;
+        
         fileItems.forEach(item => {
             item.classList.remove('selected');
             // Check if this item corresponds to the selected file using data attribute
             const filePath = item.getAttribute('data-file-path');
-            console.log('Comparing:', filePath, 'with', fileName);
             if (filePath === fileName) {
                 item.classList.add('selected');
-                console.log('File selected and highlighted:', fileName);
+                found = true;
             }
         });
+        
+        if (found) {
+            console.log('File selected and highlighted:', fileName);
+        } else {
+            console.warn('File not found in file tree:', fileName);
+        }
     }
 
     // Directory operations

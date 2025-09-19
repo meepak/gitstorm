@@ -63,7 +63,8 @@ export class MessageHandler {
                     break;
 
                 case 'showFileDiff':
-                    await this._fileHandler.handleShowFileDiff(message.filePath, message.commitHash, message.parentIndex);
+                    console.log('🚀🚀🚀 MessageHandler: showFileDiff message received:', message);
+                    await this._fileHandler.handleShowFileDiff(message.filePath, message.commitHash, message.parentIndex, message.compareAgainst, message.compareBranch);
                     break;
 
                 case 'showMultiCommitFileDiff':
@@ -72,6 +73,14 @@ export class MessageHandler {
 
                 case 'showFileDiffWithCompare':
                     await this._fileHandler.handleShowFileDiffWithCompare(message.filePath, message.compareData);
+                    break;
+
+                case 'showFileDiffWithWorking':
+                    await this._fileHandler.handleShowFileDiffWithWorking(message.filePath, message.commitHash);
+                    break;
+
+                case 'showFileDiffWithBranch':
+                    await this._fileHandler.handleShowFileDiffWithBranch(message.filePath, message.commitHash);
                     break;
 
                 case 'showWorkingDirectoryChanges':

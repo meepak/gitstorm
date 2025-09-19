@@ -16,6 +16,13 @@ export class GitOperations {
         this.commitOps = new CommitOperations(git);
         this.fileOps = new FileOperations(git);
         this.workingDirOps = new WorkingDirectoryOperations(git);
+        
+        // Debug: Check what repository we're working with
+        this.git.revparse(['--show-toplevel']).then(root => {
+            console.log('🚀🚀🚀 GitOperations: Working with repository root:', root);
+        }).catch(err => {
+            console.log('🚀🚀🚀 GitOperations: Not a git repository or error getting root:', err);
+        });
     }
 
     // Branch Operations
@@ -87,6 +94,10 @@ export class GitOperations {
 
     async getFileContentAtCommit(hash: string, filePath: string): Promise<string> {
         return this.fileOps.getFileContentAtCommit(hash, filePath);
+    }
+
+    async fileExistsAtCommit(hash: string, filePath: string): Promise<boolean> {
+        return this.fileOps.fileExistsAtCommit(hash, filePath);
     }
 
     async getMultiCommitFiles(commitHashes: string[]): Promise<FileChange[]> {

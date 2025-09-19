@@ -10,11 +10,16 @@ export class GitService {
 
     constructor() {
         const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        console.log('🚀🚀🚀 GitService: VS Code workspace folders:', vscode.workspace.workspaceFolders?.map(f => f.uri.fsPath));
+        console.log('🚀🚀🚀 GitService: Using workspace root:', workspaceRoot);
+        
         if (workspaceRoot) {
             this.git = simpleGit(workspaceRoot);
+            console.log('🚀🚀🚀 GitService: Initialized with workspace root:', workspaceRoot);
         } else {
             // Initialize with current directory as fallback
             this.git = simpleGit();
+            console.log('🚀🚀🚀 GitService: Initialized with current directory fallback');
         }
         
         this.operations = new GitOperations(this.git);
@@ -54,6 +59,10 @@ export class GitService {
 
     async getFileContentAtCommit(hash: string, filePath: string): Promise<string> {
         return await this.operations.getFileContentAtCommit(hash, filePath);
+    }
+
+    async fileExistsAtCommit(hash: string, filePath: string): Promise<boolean> {
+        return await this.operations.fileExistsAtCommit(hash, filePath);
     }
 
     async checkoutBranch(branchName: string): Promise<boolean> {

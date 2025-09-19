@@ -55,7 +55,7 @@ export class CommitHandler {
                     files: commit.files || []
                 });
             } else {
-                console.log('Backend: Sending commitDetails with no commit');
+                console.log('Backend: Sending commitDetails with no commit - commit not found or invalid');
                 this.panel.panel.webview.postMessage({
                     command: 'commitDetails',
                     commit: null,
