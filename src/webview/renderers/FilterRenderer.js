@@ -39,7 +39,22 @@ class FilterRenderer {
         const currentSelection = compareSelect.value;
         
         // Clear existing options
-        compareSelect.innerHTML = '<option value="none">Compare with branches...</option>';
+        compareSelect.innerHTML = '';
+        
+        // Add "Show all commits" as first option
+        const showAllOption = document.createElement('option');
+        showAllOption.value = 'none';
+        showAllOption.textContent = 'Show all commits';
+        compareSelect.appendChild(showAllOption);
+        
+        // Add unselectable label "Select branch to compare"
+        const labelOption = document.createElement('option');
+        labelOption.value = '';
+        labelOption.textContent = 'Select branch to compare';
+        labelOption.disabled = true;
+        labelOption.style.fontStyle = 'italic';
+        labelOption.style.color = '#666';
+        compareSelect.appendChild(labelOption);
         
         // Add branch options (only local branches)
         this.panel.branches.forEach(branch => {
@@ -55,7 +70,7 @@ class FilterRenderer {
         if (currentSelection && compareSelect.querySelector(`option[value="${currentSelection}"]`)) {
             compareSelect.value = currentSelection;
         } else {
-            // Default to current panel selection
+            // Default to "Show all commits"
             compareSelect.value = this.panel.commitsCompareAgainst || 'none';
         }
     }
