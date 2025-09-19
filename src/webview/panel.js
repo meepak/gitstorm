@@ -12,6 +12,9 @@ class PanelController {
         this.panelSizes = { branches: 280, commits: 400 };
         this.searchTimeout = null;
         this.commitsSearchTimeout = null;
+        this.compareAgainst = localStorage.getItem('gitstorm-compare-against') || 'previous'; // 'previous', 'branch', 'working'
+        this.selectedCompareBranch = localStorage.getItem('gitstorm-compare-branch') || null;
+        this.fileCompareData = {}; // Store compare data for file items
         this.initialize();
     }
 
@@ -175,6 +178,8 @@ class PanelController {
                 this.commits = commits;
                 this.populateUserFilter(commits);
                 commitsContent.innerHTML = this.generateCommitsHtml(commits, this.commitsSearchTerm, this.selectedUser);
+                // Restore commit selection after content update
+                setTimeout(() => this.updateCommitSelection(), 10);
             } else {
                 commitsContent.innerHTML = '<div class="loading">Loading commits...</div>';
             }
@@ -345,7 +350,7 @@ class PanelController {
             }
             
             return `
-                <div class="commit-item" onclick="selectCommit('${commit.hash}', event)" data-commit-index="${index}">
+                <div class="commit-item" onclick="selectCommit('${commit.hash}', event)" data-commit-hash="${commit.hash}" data-commit-index="${index}">
                     <div class="commit-graph">
                         <div class="dag-commit ${dagClass}"></div>
                     </div>
@@ -557,6 +562,8 @@ class PanelController {
         if (commitsContent) {
             const newHtml = this.generateCommitsHtml(this.commits, this.commitsSearchTerm, this.selectedUser);
             commitsContent.innerHTML = newHtml;
+            // Restore commit selection after content update
+            setTimeout(() => this.updateCommitSelection(), 10);
             console.log('Updated commits content');
         } else {
             console.log('commitsContent element not found');
@@ -712,10 +719,14 @@ class PanelController {
     updateCommitSelection() {
         // Update visual selection state for commit items
         const commitItems = document.querySelectorAll('.commit-item');
+        console.log('Updating commit selection for', commitItems.length, 'items');
+        console.log('Selected commits:', Array.from(this.selectedCommits));
+        
         commitItems.forEach(item => {
-            const hash = item.getAttribute('onclick')?.match(/selectCommit\('([^']+)'\)/)?.[1];
+            const hash = item.getAttribute('data-commit-hash');
             if (hash && this.selectedCommits.has(hash)) {
                 item.classList.add('selected');
+                console.log('Added selected class to commit:', hash);
             } else {
                 item.classList.remove('selected');
             }
@@ -744,15 +755,25 @@ class PanelController {
             filesContent.innerHTML = `
                 <div class="empty-state">
                     <h3>No selection</h3>
-                    <p>Select a commit to view file changes</p>
+                    <p>Select a commit to view file changes, or <a href="#" onclick="showWorkingDirectoryChanges()">view working directory changes</a></p>
                 </div>
             `;
         }
     }
 
+    showWorkingDirectoryChanges() {
+        console.log('Showing working directory changes');
+        this.vscode.postMessage({
+            command: 'showWorkingDirectoryChanges'
+        });
+    }
+
     updateFileChangesPanel(commit, files) {
         const filesContent = document.getElementById('filesContent');
         if (!filesContent) return;
+
+        // Clear previous file compare data
+        this.fileCompareData = {};
 
         if (!files || files.length === 0) {
             filesContent.innerHTML = `
@@ -764,14 +785,18 @@ class PanelController {
             return;
         }
 
-        // Generate file changes tree
+        // Generate file changes tree with current commit selection context
         const fileTreeHtml = this.generateFileTreeHtml(files);
         
         // Generate commit details
         const commitDetailsHtml = this.generateCommitDetailsHtml(commit);
 
+        // Generate compare against header
+        const compareHeaderHtml = this.generateCompareHeaderHtml();
+
         filesContent.innerHTML = `
             <div class="file-changes-container">
+                ${compareHeaderHtml}
                 <div class="file-changes-tree">
                     ${fileTreeHtml}
                 </div>
@@ -844,13 +869,24 @@ class PanelController {
                 const statusIcon = this.getFileStatusIcon(item.status);
                 const changeStats = this.getFileChangeStats(item);
                 
+                // Generate file click handler based on compare option and selected commits
+                const selectedCommits = Array.from(this.selectedCommits);
+                const compareData = this.getCompareData(selectedCommits);
+                
+                // Create a unique ID for this file item to store the compare data
+                const fileId = `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                
                 html += `
-                    <div class="file-tree-item file" style="margin-left: ${depth * 8}px" onclick="showFileDiff('${item.file}')">
+                    <div class="file-tree-item file" style="margin-left: ${depth * 8}px" onclick="showFileDiffWithCompare('${item.file}', '${fileId}')" data-file-id="${fileId}">
                         <span class="file-icon">${statusIcon}</span>
                         <span class="file-name">${name}</span>
                         <span class="file-stats">${changeStats}</span>
                     </div>
                 `;
+                
+                // Store the compare data for this file
+                this.fileCompareData = this.fileCompareData || {};
+                this.fileCompareData[fileId] = compareData;
             }
         });
 
@@ -878,6 +914,40 @@ class PanelController {
             return `-${file.deletions}`;
         }
         return '';
+    }
+
+    generateCompareHeaderHtml() {
+        const selectedCommits = Array.from(this.selectedCommits);
+        const isMultipleCommits = selectedCommits.length > 1;
+        
+        return `
+            <div class="compare-header">
+                <div class="compare-header-content">
+                    <span class="compare-label">Compare Against:</span>
+                    <select class="compare-select" onchange="changeCompareOption(this.value)">
+                        <option value="previous" ${this.compareAgainst === 'previous' ? 'selected' : ''}>Previous Commit</option>
+                        <option value="branch" ${this.compareAgainst === 'branch' ? 'selected' : ''}>Branch</option>
+                        <option value="working" ${this.compareAgainst === 'working' ? 'selected' : ''}>Working Directory</option>
+                    </select>
+                    ${this.compareAgainst === 'branch' ? `
+                        <select class="branch-select" onchange="changeCompareBranch(this.value)">
+                            <option value="">Select branch...</option>
+                            ${this.branches.map(branch => `
+                                <option value="${branch.name}" ${branch.name === this.selectedCompareBranch ? 'selected' : ''}>
+                                    ${branch.isRemote ? branch.name.split('/').slice(1).join('/') : branch.name}
+                                </option>
+                            `).join('')}
+                        </select>
+                    ` : ''}
+                </div>
+                <div class="compare-info">
+                    ${isMultipleCommits ? 
+                        `Showing changes for ${selectedCommits.length} commits` : 
+                        `Showing changes for selected commit`
+                    }
+                </div>
+            </div>
+        `;
     }
 
     generateCommitDetailsHtml(commit) {
@@ -938,6 +1008,66 @@ class PanelController {
             });
         }
     }
+
+    getCurrentCommitHash() {
+        // Return the first selected commit hash, or null if none selected
+        if (this.selectedCommits.size > 0) {
+            return Array.from(this.selectedCommits)[0];
+        }
+        return null;
+    }
+
+    getCompareData(selectedCommits) {
+        const data = {
+            compareAgainst: this.compareAgainst,
+            selectedCommits: selectedCommits
+        };
+
+        switch (this.compareAgainst) {
+            case 'previous':
+                // Compare against previous commit(s)
+                break;
+            case 'branch':
+                data.compareBranch = this.selectedCompareBranch;
+                break;
+            case 'working':
+                // Compare against working directory
+                break;
+        }
+
+        return data;
+    }
+
+    changeCompareOption(option) {
+        this.compareAgainst = option;
+        this.selectedCompareBranch = null;
+        
+        // Save the compare option to localStorage
+        localStorage.setItem('gitstorm-compare-against', option);
+        
+        // Refresh the file changes panel to update the compare header
+        const selectedCommits = Array.from(this.selectedCommits);
+        if (selectedCommits.length === 1) {
+            this.showCommitFileChanges(selectedCommits[0]);
+        } else if (selectedCommits.length > 1) {
+            this.showMultiCommitFileChanges(selectedCommits);
+        }
+    }
+
+    changeCompareBranch(branchName) {
+        this.selectedCompareBranch = branchName;
+        
+        // Save the selected branch to localStorage
+        localStorage.setItem('gitstorm-compare-branch', branchName);
+        
+        // Refresh the file changes panel
+        const selectedCommits = Array.from(this.selectedCommits);
+        if (selectedCommits.length === 1) {
+            this.showCommitFileChanges(selectedCommits[0]);
+        } else if (selectedCommits.length > 1) {
+            this.showMultiCommitFileChanges(selectedCommits);
+        }
+    }
 }
 
 // Global functions for HTML onclick handlers
@@ -986,14 +1116,52 @@ function toggleFileTreeItem(element) {
     }
 }
 
-function showFileDiff(filePath) {
-    console.log('Show file diff for:', filePath);
-    // This could be expanded to show actual file diff
-    // For now, just log the file path
+function showFileDiff(filePath, commitHash) {
+    console.log('Show file diff for:', filePath, 'commit:', commitHash);
     panelController.vscode.postMessage({
         command: 'showFileDiff',
-        filePath: filePath
+        filePath: filePath,
+        commitHash: commitHash
     });
+}
+
+function showMultiCommitFileDiff(filePath, commitHashes) {
+    console.log('Show multi-commit file diff for:', filePath, 'commits:', commitHashes);
+    panelController.vscode.postMessage({
+        command: 'showMultiCommitFileDiff',
+        filePath: filePath,
+        commitHashes: commitHashes
+    });
+}
+
+function showFileDiffWithCompare(filePath, fileId) {
+    console.log('Show file diff with file ID:', filePath, fileId);
+    
+    // Get the compare data from the stored data
+    const compareData = panelController.fileCompareData && panelController.fileCompareData[fileId];
+    if (!compareData) {
+        console.error('No compare data found for file ID:', fileId);
+        return;
+    }
+    
+    console.log('Compare data:', compareData);
+    panelController.vscode.postMessage({
+        command: 'showFileDiffWithCompare',
+        filePath: filePath,
+        compareData: compareData
+    });
+}
+
+function changeCompareOption(option) {
+    panelController.changeCompareOption(option);
+}
+
+function changeCompareBranch(branchName) {
+    panelController.changeCompareBranch(branchName);
+}
+
+function showWorkingDirectoryChanges() {
+    panelController.showWorkingDirectoryChanges();
 }
 
 // Initialize when DOM is ready

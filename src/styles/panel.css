@@ -511,6 +511,53 @@ input[type="text"]:focus {
     height: 100%;
 }
 
+/* Compare Header Styles */
+.compare-header {
+    background-color: var(--vscode-panel-background);
+    border-bottom: 1px solid var(--vscode-panel-border);
+    padding: 8px 12px;
+    margin-bottom: 8px;
+}
+
+.compare-header-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.compare-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+    white-space: nowrap;
+}
+
+.compare-select, .branch-select {
+    padding: 4px 8px;
+    border: 1px solid var(--vscode-input-border);
+    background-color: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    border-radius: 3px;
+    font-size: 12px;
+    min-width: 120px;
+}
+
+.compare-select:focus, .branch-select:focus {
+    outline: none;
+    border-color: var(--vscode-focusBorder);
+}
+
+.branch-select {
+    min-width: 150px;
+}
+
+.compare-info {
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    font-style: italic;
+}
+
 .file-changes-tree {
     flex: 1;
     overflow-y: auto;

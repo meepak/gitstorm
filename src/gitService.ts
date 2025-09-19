@@ -249,6 +249,31 @@ export class GitService {
         }
     }
 
+    async getFileDiffRange(range: string, file?: string): Promise<string> {
+        try {
+            // Get diff for a custom range (e.g., "branch1..branch2", "commit1..commit2")
+            const options = [range];
+            if (file) {
+                options.push('--', file);
+            }
+            return await this.git.diff(options);
+        } catch (error) {
+            console.error('Error getting file diff range:', error);
+            return '';
+        }
+    }
+
+    async getFileContentAtCommit(hash: string, filePath: string): Promise<string> {
+        try {
+            // Get file content at specific commit
+            const content = await this.git.show([`${hash}:${filePath}`]);
+            return content;
+        } catch (error) {
+            console.error('Error getting file content at commit:', error);
+            return '';
+        }
+    }
+
     async checkoutBranch(branchName: string): Promise<boolean> {
         try {
             await this.git.checkout(branchName);
