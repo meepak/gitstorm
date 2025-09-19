@@ -374,6 +374,33 @@ class PanelController {
         }
     }
 
+    // New single dropdown handler
+    changeCompareOptionSingle(value) {
+        if (value === 'previous') {
+            this.compareAgainst = 'previous';
+            this.selectedCompareBranch = null;
+            localStorage.setItem('gitstorm-compare-against', 'previous');
+        } else if (value === 'working') {
+            this.compareAgainst = 'working';
+            this.selectedCompareBranch = null;
+            localStorage.setItem('gitstorm-compare-against', 'working');
+        } else if (value.startsWith('branch:')) {
+            const branchName = value.substring(7); // Remove 'branch:' prefix
+            this.compareAgainst = 'branch';
+            this.selectedCompareBranch = branchName;
+            localStorage.setItem('gitstorm-compare-against', 'branch');
+            localStorage.setItem('gitstorm-compare-branch', branchName);
+        }
+        
+        // Refresh the file changes panel
+        const selectedCommits = Array.from(this.selectedCommits);
+        if (selectedCommits.length === 1) {
+            this.showCommitFileChanges(selectedCommits[0]);
+        } else if (selectedCommits.length > 1) {
+            this.showMultiCommitFileChanges(selectedCommits);
+        }
+    }
+
     changeCommitsCompareOption(branchName) {
         this.commitsCompareAgainst = branchName;
         localStorage.setItem('gitstorm-commits-compare-against', branchName);

@@ -708,30 +708,26 @@ input[type="text"]:focus {
     margin-bottom: 4px;
 }
 
-.compare-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--vscode-foreground);
-    white-space: nowrap;
+.compare-icon {
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.compare-select, .branch-select {
+.compare-select {
     padding: 4px 8px;
     border: 1px solid var(--vscode-input-border);
     background-color: var(--vscode-input-background);
     color: var(--vscode-input-foreground);
     border-radius: 3px;
     font-size: 12px;
-    min-width: 120px;
+    min-width: 150px;
 }
 
-.compare-select:focus, .branch-select:focus {
+.compare-select:focus {
     outline: none;
     border-color: var(--vscode-focusBorder);
-}
-
-.branch-select {
-    min-width: 150px;
 }
 
 .compare-info {

@@ -122,6 +122,10 @@ function changeCompareBranch(value) {
     panelController.changeCompareBranch(value);
 }
 
+function changeCompareOptionSingle(value) {
+    panelController.changeCompareOptionSingle(value);
+}
+
 function changeCommitsCompareOption(value) {
     panelController.changeCommitsCompareOption(value);
 }
@@ -200,6 +204,7 @@ window.togglePanel = togglePanel;
 window.showWorkingDirectoryChanges = showWorkingDirectoryChanges;
 window.changeCompareOption = changeCompareOption;
 window.changeCompareBranch = changeCompareBranch;
+window.changeCompareOptionSingle = changeCompareOptionSingle;
 window.changeCommitsCompareOption = changeCommitsCompareOption;
 window.showSquashDialog = showSquashDialog;
 window.toggleSection = toggleSection;

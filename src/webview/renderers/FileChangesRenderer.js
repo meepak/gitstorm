@@ -133,23 +133,33 @@ class FileChangesRenderer {
         const selectedCommits = Array.from(this.panel.selectedCommits);
         const isMultipleCommits = selectedCommits.length > 1;
         
+        // Build the single dropdown options
+        let dropdownOptions = '';
+        
+        // Previous Commit (default)
+        dropdownOptions += `<option value="previous" ${this.panel.compareAgainst === 'previous' ? 'selected' : ''}>Previous Commit</option>`;
+        
+        // Current Working Directory
+        dropdownOptions += `<option value="working" ${this.panel.compareAgainst === 'working' ? 'selected' : ''}>Current Working Directory</option>`;
+        
+        // Non-selectable separator
+        dropdownOptions += `<option value="" disabled style="font-style: italic; color: #666;">Select Branch to Compare</option>`;
+        
+        // Branch options
+        if (this.panel.branches && this.panel.branches.length > 0) {
+            this.panel.branches.forEach(branch => {
+                const isSelected = this.panel.compareAgainst === 'branch' && this.panel.selectedCompareBranch === branch.name;
+                dropdownOptions += `<option value="branch:${branch.name}" ${isSelected ? 'selected' : ''}>${branch.name}</option>`;
+            });
+        }
+        
         return `
             <div class="compare-header">
                 <div class="compare-header-content">
-                    <span class="compare-label">Compare Against:</span>
-                    <select class="compare-select" onchange="changeCompareOption(this.value)">
-                        <option value="previous" ${this.panel.compareAgainst === 'previous' ? 'selected' : ''}>Previous Commit</option>
-                        <option value="branch" ${this.panel.compareAgainst === 'branch' ? 'selected' : ''}>Branch</option>
-                        <option value="working" ${this.panel.compareAgainst === 'working' ? 'selected' : ''}>Working Directory</option>
+                    <span class="compare-icon">🔄</span>
+                    <select class="compare-select" onchange="changeCompareOptionSingle(this.value)">
+                        ${dropdownOptions}
                     </select>
-                    ${this.panel.compareAgainst === 'branch' ? `
-                        <select class="branch-select" onchange="changeCompareBranch(this.value)">
-                            <option value="">Select branch...</option>
-                            ${this.panel.branches ? this.panel.branches.map(branch => 
-                                `<option value="${branch.name}" ${branch.name === this.panel.selectedCompareBranch ? 'selected' : ''}>${branch.name}</option>`
-                            ).join('') : ''}
-                        </select>
-                    ` : ''}
                 </div>
                 <div class="compare-info">
                     ${isMultipleCommits ? 'Multiple commits selected' : selectedCommits.length === 1 ? 'Single commit selected' : 'No commits selected'}
