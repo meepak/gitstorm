@@ -1,6 +1,6 @@
 {
-  "name": "gitstorm-panel",
-  "displayName": "GitStorm Panel",
+  "name": "gitstorm",
+  "displayName": "GitStorm",
   "description": "PhpStorm-style Git panel with branches, commits, and file changes",
   "version": "0.1.0",
   "publisher": "gitstorm",
@@ -21,8 +21,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "gitstorm.openPanel",
-        "title": "Open GitStorm Panel"
+        "command": "gitstorm.open",
+        "title": "Open GitStorm"
       },
       {
         "command": "gitstorm.refresh",

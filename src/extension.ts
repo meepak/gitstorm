@@ -17,7 +17,7 @@ export function activate(context: vscode.ExtensionContext) {
     gitService = new GitService();
 
     // Register commands
-    const openPanelCommand = vscode.commands.registerCommand('gitstorm.openPanel', () => {
+    const openCommand = vscode.commands.registerCommand('gitstorm.open', () => {
         if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
             vscode.window.showWarningMessage('Please open a workspace folder first.');
             return;
@@ -29,7 +29,7 @@ export function activate(context: vscode.ExtensionContext) {
         GitStormPanel.currentPanel?.refresh();
     });
 
-    context.subscriptions.push(openPanelCommand, refreshCommand);
+    context.subscriptions.push(openCommand, refreshCommand);
 
     // Auto-open panel if workspace has git repository
     gitService.isGitRepository().then(isGit => {
