@@ -190,18 +190,43 @@ function openWorkingFile(filePath) {
 document.addEventListener('DOMContentLoaded', () => {
     // Wait a bit to ensure all scripts are loaded
     setTimeout(() => {
-        if (typeof CacheManager === 'undefined') {
-            console.error('CacheManager not loaded, retrying...');
-            setTimeout(() => {
-                panelController = new PanelController();
-                console.log('GitStorm Panel initialized');
-            }, 100);
-        } else {
-            panelController = new PanelController();
-            console.log('GitStorm Panel initialized');
-        }
+        initializePanel();
     }, 50);
 });
+
+function initializePanel() {
+    // Check if we're in a webview environment
+    if (window.location.protocol === 'vscode-webview:') {
+        console.log('Running in VSCode webview environment');
+    }
+    
+    if (typeof CacheManager === 'undefined') {
+        console.error('CacheManager not loaded, retrying...');
+        setTimeout(() => {
+            if (typeof CacheManager === 'undefined') {
+                console.error('CacheManager still not loaded after retry. Some features may not work.');
+                console.error('This might be due to webview caching issues. Try restarting VSCode.');
+                // Initialize without CacheManager as fallback
+                try {
+                    panelController = new PanelController();
+                    console.log('GitStorm Panel initialized (without CacheManager)');
+                } catch (error) {
+                    console.error('Failed to initialize PanelController:', error);
+                }
+            } else {
+                panelController = new PanelController();
+                console.log('GitStorm Panel initialized');
+            }
+        }, 200);
+    } else {
+        try {
+            panelController = new PanelController();
+            console.log('GitStorm Panel initialized');
+        } catch (error) {
+            console.error('Failed to initialize PanelController:', error);
+        }
+    }
+}
 
 // Export for debugging
 window.panelController = null;

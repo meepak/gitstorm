@@ -222,17 +222,17 @@ class CacheManager {
 
     // Restore search input values
     restoreSearchInputs() {
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput && this.panel.searchTerm) {
-            searchInput.value = this.panel.searchTerm;
+        const branchesSearchInput = document.getElementById('branchesSearch');
+        if (branchesSearchInput && this.panel.searchTerm) {
+            branchesSearchInput.value = this.panel.searchTerm;
         }
         
-        const commitsSearchInput = document.getElementById('commitsSearchInput');
+        const commitsSearchInput = document.getElementById('commitsSearch');
         if (commitsSearchInput && this.panel.commitsSearchTerm) {
             commitsSearchInput.value = this.panel.commitsSearchTerm;
         }
         
-        const filesSearchInput = document.getElementById('filesSearchInput');
+        const filesSearchInput = document.getElementById('filesSearch');
         if (filesSearchInput && this.panel.filesSearchTerm) {
             filesSearchInput.value = this.panel.filesSearchTerm;
         }
@@ -366,6 +366,112 @@ class CacheManager {
             lastUpdateTime: null,
             isPopulated: false
         };
+    }
+
+    // Cache compare settings
+    cacheCompareSettings() {
+        try {
+            const compareSettings = {
+                compareAgainst: this.panel.compareAgainst,
+                selectedCompareBranch: this.panel.selectedCompareBranch,
+                commitsCompareAgainst: this.panel.commitsCompareAgainst,
+                timestamp: Date.now()
+            };
+            
+            localStorage.setItem('gitstorm-compare-settings', JSON.stringify(compareSettings));
+        } catch (error) {
+            console.error('Error caching compare settings:', error);
+        }
+    }
+
+    // Restore compare settings
+    restoreCompareSettings() {
+        try {
+            const saved = localStorage.getItem('gitstorm-compare-settings');
+            if (saved) {
+                const data = JSON.parse(saved);
+                this.panel.compareAgainst = data.compareAgainst || 'working';
+                this.panel.selectedCompareBranch = data.selectedCompareBranch || null;
+                this.panel.commitsCompareAgainst = data.commitsCompareAgainst || 'none';
+                return true;
+            }
+        } catch (error) {
+            console.error('Error restoring compare settings:', error);
+        }
+        return false;
+    }
+
+    // Cache panel sizes
+    cachePanelSizes() {
+        try {
+            localStorage.setItem('gitstorm-panel-sizes', JSON.stringify(this.panel.panelSizes));
+        } catch (error) {
+            console.error('Error caching panel sizes:', error);
+        }
+    }
+
+    // Restore panel sizes
+    restorePanelSizes() {
+        try {
+            const saved = localStorage.getItem('gitstorm-panel-sizes');
+            if (saved) {
+                this.panel.panelSizes = JSON.parse(saved);
+                return true;
+            }
+        } catch (error) {
+            console.error('Error restoring panel sizes:', error);
+        }
+        return false;
+    }
+
+    // Cache UI state
+    cacheUIState() {
+        try {
+            const stateData = {
+                selectedCommits: Array.from(this.panel.selectedCommits),
+                lastClickedCommit: this.panel.lastClickedCommit,
+                searchTerm: this.panel.searchTerm,
+                commitsSearchTerm: this.panel.commitsSearchTerm,
+                filesSearchTerm: this.panel.filesSearchTerm,
+                selectedUser: this.panel.selectedUser,
+                selectedFileId: this.panel.selectedFileId,
+                currentBranch: this.panel.currentBranch,
+                timestamp: Date.now()
+            };
+            
+            localStorage.setItem('gitstorm-ui-state', JSON.stringify(stateData));
+        } catch (error) {
+            console.error('Error caching UI state:', error);
+        }
+    }
+
+    // Restore UI state
+    restoreUIState() {
+        try {
+            const saved = localStorage.getItem('gitstorm-ui-state');
+            if (saved) {
+                const data = JSON.parse(saved);
+                this.panel.selectedCommits = new Set(data.selectedCommits || []);
+                this.panel.lastClickedCommit = data.lastClickedCommit || null;
+                this.panel.searchTerm = data.searchTerm || '';
+                this.panel.commitsSearchTerm = data.commitsSearchTerm || '';
+                this.panel.filesSearchTerm = data.filesSearchTerm || '';
+                this.panel.selectedUser = data.selectedUser || 'all';
+                this.panel.selectedFileId = data.selectedFileId || null;
+                this.panel.currentBranch = data.currentBranch || null;
+                return true;
+            }
+        } catch (error) {
+            console.error('Error restoring UI state:', error);
+        }
+        return false;
+    }
+
+    // Restore dropdown data
+    restoreDropdownData() {
+        // This method is called to populate dropdowns from cache
+        // The actual dropdown population is handled by populateDropdownsFromCache in PanelController
+        return this.isDropdownCacheValid();
     }
 }
 

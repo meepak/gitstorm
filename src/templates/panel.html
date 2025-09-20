@@ -20,6 +20,12 @@
         </div>
     </div>
     
+    <!-- Global loading spinner -->
+    <div id="globalLoadingSpinner" class="global-loading-spinner" style="display: none;">
+        <div class="spinner"></div>
+        <div class="loading-text">Loading...</div>
+    </div>
+    
     <div class="main-content">
         <div id="branchesPanel" class="panel branches-panel">
             <div class="panel-header" oncontextmenu="event.preventDefault(); showPanelContextMenu(event, 'branches')">
@@ -31,7 +37,7 @@
             </div>
             <div class="panel-content">
                 <div id="branchesContent">
-                    <div class="loading">Loading branches...</div>
+                    <div class="empty-state"><h3>No branches</h3><p>Select a repository to view branches</p></div>
                 </div>
             </div>
             <div id="resizeBranches" class="resize-handle" data-panel="branches"></div>
@@ -61,7 +67,7 @@
             </div>
             <div class="panel-content">
                 <div id="commitsContent">
-                    <div class="loading">Loading commits...</div>
+                    <div class="empty-state"><h3>No commits</h3><p>Select a branch to view commits</p></div>
                 </div>
             </div>
             <div id="resizeCommits" class="resize-handle" data-panel="commits"></div>
@@ -89,7 +95,7 @@
             </div>
             <div class="panel-content">
                 <div id="filesContent">
-                    <div class="empty-state"><h3>Select a commit to view changes</h3></div>
+                    <div class="empty-state"><h3>No files</h3><p>Select a commit to view file changes</p></div>
                 </div>
             </div>
             <div class="panel-footer" id="filesFooter">

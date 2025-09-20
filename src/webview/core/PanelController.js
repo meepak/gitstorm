@@ -13,28 +13,27 @@ class PanelController {
         this.selectedUser = 'all';
         this.currentFiles = [];
         this.selectedCommit = null;
-        // Load saved panel sizes or use defaults
-        const savedSizes = localStorage.getItem('gitstorm-panel-sizes');
-        this.panelSizes = savedSizes ? JSON.parse(savedSizes) : { branches: 280, commits: 400, files: 300 };
+        // Initialize with default values (will be restored from cache later)
+        this.panelSizes = { branches: 280, commits: 400, files: 300 };
         this.searchTimeout = null;
         this.commitsSearchTimeout = null;
-        this.compareAgainst = localStorage.getItem('gitstorm-compare-against') || 'working';
-        console.log('Initialized compareAgainst:', this.compareAgainst, 'from localStorage:', localStorage.getItem('gitstorm-compare-against'));
-        this.selectedCompareBranch = localStorage.getItem('gitstorm-compare-branch') || null;
+        this.compareAgainst = 'working';
+        this.selectedCompareBranch = null;
         this.fileCompareData = {};
         this.selectedFileId = null;
-        this.commitsCompareAgainst = localStorage.getItem('gitstorm-commits-compare-against') || 'none';
+        this.commitsCompareAgainst = 'none';
         this.hasUncommittedChanges = false;
         this.hasStagedChanges = false;
         
         // Initialize cache manager
         console.log('PanelController: About to create CacheManager...', typeof CacheManager);
         if (typeof CacheManager === 'undefined') {
-            console.error('PanelController: CacheManager is not defined! Script loading order issue.');
-            throw new Error('CacheManager is not defined. Check script loading order.');
+            console.warn('PanelController: CacheManager is not defined! Caching will be disabled.');
+            this.cacheManager = null;
+        } else {
+            this.cacheManager = new CacheManager(this);
+            console.log('PanelController: CacheManager created successfully');
         }
-        this.cacheManager = new CacheManager(this);
-        console.log('PanelController: CacheManager created successfully');
         
         // Initialize sub-components (UIRenderer first as others depend on it)
         this.uiRenderer = new UIRenderer(this);
@@ -57,8 +56,7 @@ class PanelController {
         this.setupMutationObserver();
         this.contextMenuHandler.setupContextMenu();
         
-        // Initialize compare dropdown state
-        this.initializeCompareDropdownState();
+        // Compare dropdown state is now initialized from cache in loadDataAsynchronously
         
         // Setup search manager after a short delay to ensure DOM is ready
         setTimeout(() => {
@@ -86,14 +84,18 @@ class PanelController {
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden) {
                 console.log('Panel became visible, checking if data needs refresh...');
-                this.cacheManager.handleVisibilityChange();
+                if (this.cacheManager) {
+                    this.cacheManager.handleVisibilityChange();
+                }
             }
         });
         
         // Handle focus events as backup for visibility detection
         window.addEventListener('focus', () => {
             console.log('Window focused, checking if data needs refresh...');
-            this.cacheManager.handleVisibilityChange();
+            if (this.cacheManager) {
+                this.cacheManager.handleVisibilityChange();
+            }
         });
     }
 
@@ -186,7 +188,10 @@ class PanelController {
     }
 
     savePanelSizes() {
-        localStorage.setItem('gitstorm-panel-sizes', JSON.stringify(this.panelSizes));
+        // Cache panel sizes
+        if (this.cacheManager) {
+            this.cacheManager.cachePanelSizes();
+        }
     }
 
     // Main update content method - delegates to UI renderer
@@ -213,11 +218,22 @@ class PanelController {
         this.hasUncommittedChanges = hasUncommittedChanges;
         this.hasStagedChanges = hasStagedChanges;
         
-        // Cache the data for persistence
-        this.cacheManager.cacheData(branches, commits, hasUncommittedChanges, hasStagedChanges);
-        
-        // Cache dropdown data for smooth UI
-        this.cacheManager.cacheDropdownData(commits, branches);
+        // Cache the data for persistence (async, non-blocking)
+        if (this.cacheManager) {
+            this.cacheManager.cacheData(branches, commits, hasUncommittedChanges, hasStagedChanges);
+            
+            // Cache dropdown data for smooth UI (async, non-blocking)
+            this.cacheManager.cacheDropdownData(commits, branches);
+            
+            // Cache UI state (async, non-blocking)
+            this.cacheManager.cacheUIState();
+            
+            // Cache compare settings (async, non-blocking)
+            this.cacheManager.cacheCompareSettings();
+            
+            // Cache panel sizes (async, non-blocking)
+            this.cacheManager.cachePanelSizes();
+        }
         
         // Delegate to UI renderer
         this.uiRenderer.updateContent(branches, commits, error, hasUncommittedChanges, hasStagedChanges);
@@ -459,8 +475,10 @@ class PanelController {
             this.selectedCompareBranch = null;
         }
         
-        // Save the compare option to localStorage
-        localStorage.setItem('gitstorm-compare-against', option);
+        // Cache the compare option
+        if (this.cacheManager) {
+            this.cacheManager.cacheCompareSettings();
+        }
         
         // Refresh the file changes panel to update the compare header
         const selectedCommits = Array.from(this.selectedCommits);
@@ -474,8 +492,10 @@ class PanelController {
     changeCompareBranch(branchName) {
         this.selectedCompareBranch = branchName;
         
-        // Save the selected branch to localStorage
-        localStorage.setItem('gitstorm-compare-branch', branchName);
+        // Cache the selected branch
+        if (this.cacheManager) {
+            this.cacheManager.cacheCompareSettings();
+        }
         
         // Refresh the file changes panel
         const selectedCommits = Array.from(this.selectedCommits);
@@ -491,17 +511,18 @@ class PanelController {
         if (value === 'previous') {
             this.compareAgainst = 'previous';
             this.selectedCompareBranch = null;
-            localStorage.setItem('gitstorm-compare-against', 'previous');
         } else if (value === 'working') {
             this.compareAgainst = 'working';
             this.selectedCompareBranch = null;
-            localStorage.setItem('gitstorm-compare-against', 'working');
         } else if (value.startsWith('branch:')) {
             const branchName = value.substring(7); // Remove 'branch:' prefix
             this.compareAgainst = 'branch';
             this.selectedCompareBranch = branchName;
-            localStorage.setItem('gitstorm-compare-against', 'branch');
-            localStorage.setItem('gitstorm-compare-branch', branchName);
+        }
+        
+        // Cache the compare settings
+        if (this.cacheManager) {
+            this.cacheManager.cacheCompareSettings();
         }
         
         // Refresh the file changes panel
@@ -515,7 +536,11 @@ class PanelController {
 
     changeCommitsCompareOption(branchName) {
         this.commitsCompareAgainst = branchName;
-        localStorage.setItem('gitstorm-commits-compare-against', branchName);
+        
+        // Cache the commits compare setting
+        if (this.cacheManager) {
+            this.cacheManager.cacheCompareSettings();
+        }
         
         if (branchName === 'none') {
             // If no compare option selected, refresh current commits
@@ -546,7 +571,7 @@ class PanelController {
     }
 
     restoreCompareDropdownState() {
-        // Restore the compare dropdown state from localStorage
+        // Restore the compare dropdown state from cache
         const compareSelect = document.getElementById('commitsCompareFilter');
         if (compareSelect && this.commitsCompareAgainst) {
             compareSelect.value = this.commitsCompareAgainst;
@@ -554,14 +579,6 @@ class PanelController {
         }
     }
 
-    // Initialize compare dropdown state from localStorage
-    initializeCompareDropdownState() {
-        const savedCompareState = localStorage.getItem('gitstorm-commits-compare-against');
-        if (savedCompareState) {
-            this.commitsCompareAgainst = savedCompareState;
-            console.log('Initialized compare dropdown state from localStorage:', this.commitsCompareAgainst);
-        }
-    }
 
     // Setup refresh button
     setupRefreshButton() {
@@ -576,88 +593,81 @@ class PanelController {
 
     // Load UI with empty state immediately
     loadUIWithEmptyState() {
-        // Show empty state for each panel
-        const branchesContent = document.getElementById('branchesContent');
-        const commitsContent = document.getElementById('commitsContent');
-        const filesContent = document.getElementById('filesContent');
-        
-        if (branchesContent) {
-            branchesContent.innerHTML = '<div class="empty-state"><h3>Loading branches...</h3></div>';
-        }
-        
-        if (commitsContent) {
-            commitsContent.innerHTML = '<div class="empty-state"><h3>Loading commits...</h3></div>';
-        }
-        
-        if (filesContent) {
-            filesContent.innerHTML = '<div class="empty-state"><h3>Select a commit to view changes</h3></div>';
-        }
-        
         // Populate dropdowns immediately if we have cached data
         this.populateDropdownsFromCache();
     }
 
     // Load data asynchronously
     async loadDataAsynchronously() {
-        // Check if we have cached data first
-        const restored = this.cacheManager.restoreCachedData();
+        // Show loading states on panels
+        this.showPanelLoadingStates();
         
-        if (restored) {
-            // Show loading state for each panel
-            this.showPanelLoadingStates();
-            
+        // Try to load from cache first (if available)
+        let dataRestored = false;
+        let stateRestored = false;
+        let dropdownsRestored = false;
+        let compareSettingsRestored = false;
+        let panelSizesRestored = false;
+        
+        if (this.cacheManager) {
+            dataRestored = this.cacheManager.restoreCachedData();
+            stateRestored = this.cacheManager.restoreUIState();
+            dropdownsRestored = this.cacheManager.restoreDropdownData();
+            compareSettingsRestored = this.cacheManager.restoreCompareSettings();
+            panelSizesRestored = this.cacheManager.restorePanelSizes();
+        }
+        
+        if (dataRestored) {
             // Restore UI with cached data
+            this.uiRenderer.updateContent(
+                this.cacheManager.dataCache.branches, 
+                this.cacheManager.dataCache.commits, 
+                null, 
+                this.cacheManager.dataCache.hasUncommittedChanges, 
+                this.cacheManager.dataCache.hasStagedChanges
+            );
+            
+            // Restore dropdown data
+            if (dropdownsRestored) {
+                this.populateDropdownsFromCache();
+            }
+            
+            // Restore form values after a short delay to ensure DOM is ready
             setTimeout(() => {
-                this.uiRenderer.updateContent(
-                    this.cacheManager.dataCache.branches, 
-                    this.cacheManager.dataCache.commits, 
-                    null, 
-                    this.cacheManager.dataCache.hasUncommittedChanges, 
-                    this.cacheManager.dataCache.hasStagedChanges
-                );
-                
-                // Restore selections and UI state
-                this.cacheManager.restoreUIState();
-                this.hidePanelLoadingStates();
+                if (this.cacheManager) {
+                    this.cacheManager.restoreSearchInputs();
+                    this.cacheManager.restoreUserFilter();
+                }
+                this.restoreCompareDropdownState();
             }, 100);
+            
+            // Hide loading states
+            this.hidePanelLoadingStates();
+            
+            // Check if cache is stale and refresh in background
+            if (this.cacheManager && this.cacheManager.isCacheStale()) {
+                // Cache is stale, refreshing in background
+                this.refreshData();
+            }
         } else {
-            // No cached data, request fresh data from extension
-            this.showPanelLoadingStates();
+            // No cached data, load from extension
             this.vscode.postMessage({ command: 'refresh' });
         }
     }
 
-    // Show loading states for individual panels
+    // Show global loading spinner
     showPanelLoadingStates() {
-        const branchesPanel = document.getElementById('branchesPanel');
-        const commitsPanel = document.getElementById('commitsPanel');
-        const filesPanel = document.getElementById('filesPanel');
-        
-        if (branchesPanel) {
-            branchesPanel.classList.add('panel-loading');
-        }
-        if (commitsPanel) {
-            commitsPanel.classList.add('panel-loading');
-        }
-        if (filesPanel) {
-            filesPanel.classList.add('panel-loading');
+        const globalSpinner = document.getElementById('globalLoadingSpinner');
+        if (globalSpinner) {
+            globalSpinner.style.display = 'flex';
         }
     }
 
-    // Hide loading states for individual panels
+    // Hide global loading spinner
     hidePanelLoadingStates() {
-        const branchesPanel = document.getElementById('branchesPanel');
-        const commitsPanel = document.getElementById('commitsPanel');
-        const filesPanel = document.getElementById('filesPanel');
-        
-        if (branchesPanel) {
-            branchesPanel.classList.remove('panel-loading');
-        }
-        if (commitsPanel) {
-            commitsPanel.classList.remove('panel-loading');
-        }
-        if (filesPanel) {
-            filesPanel.classList.remove('panel-loading');
+        const globalSpinner = document.getElementById('globalLoadingSpinner');
+        if (globalSpinner) {
+            globalSpinner.style.display = 'none';
         }
     }
 

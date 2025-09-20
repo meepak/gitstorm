@@ -11,7 +11,8 @@ export class WebviewRenderer {
         let htmlContent = fs.readFileSync(htmlPath, 'utf8');
 
         // Load CSS
-        const cssPath = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'src', 'styles', 'panel.css'));
+        const cssPath = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'out', 'styles', 'panel.css'));
+        const cssCacheBuster = `?v=${Date.now()}`;
         
         // Load JS files
         const jsFiles = [
@@ -31,12 +32,14 @@ export class WebviewRenderer {
         ];
         
         const jsScripts = jsFiles.map(file => {
-            const jsPath = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'src', 'webview', file));
-            return `<script src="${jsPath}"></script>`;
+            const jsPath = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'out', 'webview', file));
+            // Add cache-busting parameter to prevent stale webview URLs
+            const cacheBuster = `?v=${Date.now()}`;
+            return `<script src="${jsPath}${cacheBuster}"></script>`;
         }).join('\n    ');
 
         // Inject CSS and JS paths
-        htmlContent = htmlContent.replace('<!-- CSS_PLACEHOLDER -->', `<link href="${cssPath}" rel="stylesheet">`);
+        htmlContent = htmlContent.replace('<!-- CSS_PLACEHOLDER -->', `<link href="${cssPath}${cssCacheBuster}" rel="stylesheet">`);
         htmlContent = htmlContent.replace('<!-- Load JavaScript modules in correct order -->', jsScripts);
         
         // Inject initial panel sizes

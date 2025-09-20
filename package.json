@@ -4,6 +4,10 @@
   "description": "PhpStorm-style Git panel with branches, commits, and file changes",
   "version": "0.1.0",
   "publisher": "gitstorm",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/meepak/gitstorm"
+  },
   "engines": {
     "vscode": "^1.74.0"
   },

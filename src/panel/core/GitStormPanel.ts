@@ -41,7 +41,8 @@ export class GitStormPanel {
                 localResourceRoots: [
                     vscode.Uri.joinPath(extensionUri, 'src'),
                     vscode.Uri.joinPath(extensionUri, 'out')
-                ]
+                ],
+                retainContextWhenHidden: false
             }
         );
 

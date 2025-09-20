@@ -12,6 +12,8 @@ class SearchManager {
         if (branchesSearchInput) {
             branchesSearchInput.addEventListener('input', (e) => {
                 this.panel.searchTerm = e.target.value;
+                // Cache the search term
+                this.panel.cacheManager.cacheUIState();
                 this.debounce(() => this.filterBranches(), 300);
             });
         }
@@ -21,6 +23,8 @@ class SearchManager {
         if (commitsSearchInput) {
             commitsSearchInput.addEventListener('input', (e) => {
                 this.panel.commitsSearchTerm = e.target.value;
+                // Cache the search term
+                this.panel.cacheManager.cacheUIState();
                 this.debounce(() => this.filterCommits(), 300);
             });
         }
@@ -30,6 +34,8 @@ class SearchManager {
         if (userFilter) {
             userFilter.addEventListener('change', (e) => {
                 this.panel.selectedUser = e.target.value;
+                // Cache the user filter selection
+                this.panel.cacheManager.cacheUIState();
                 this.filterCommits();
             });
         }
@@ -49,6 +55,8 @@ class SearchManager {
             filesSearchInput.addEventListener('input', (e) => {
                 console.log('Files search input changed:', e.target.value);
                 this.panel.filesSearchTerm = e.target.value;
+                // Cache the search term
+                this.panel.cacheManager.cacheUIState();
                 this.debounce(() => this.filterFiles(), 300);
             });
         } else {
@@ -228,8 +236,9 @@ class SearchManager {
         console.log('Current branch:', this.panel.currentBranch);
         
         // Store the selection
-        localStorage.setItem('gitstorm-commits-compare-against', branchName);
         this.panel.commitsCompareAgainst = branchName;
+        // Cache the commits compare setting
+        this.panel.cacheManager.cacheCompareSettings();
         
         // Update the compare select element
         const compareSelect = document.getElementById('commitsCompareFilter');
