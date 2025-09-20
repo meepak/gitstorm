@@ -7,7 +7,7 @@ export class WebviewRenderer {
 
     getHtmlForWebview(webview: vscode.Webview): string {
         // Load HTML template
-        const htmlPath = path.join(this.extensionUri.fsPath, 'src', 'templates', 'panel.html');
+        const htmlPath = path.join(this.extensionUri.fsPath, 'out', 'templates', 'panel.html');
         let htmlContent = fs.readFileSync(htmlPath, 'utf8');
 
         // Load CSS
