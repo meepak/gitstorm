@@ -217,6 +217,7 @@ body {
     padding: 0;
 }
 
+.files-header,
 .commits-header {
     flex-shrink: 0;
     padding: 8px;
@@ -520,7 +521,7 @@ input[type="text"]:focus {
     background-color: var(--vscode-toolbar-activeBackground);
 }
 
-/* Commits filters */
+.files-filters,
 .commits-filters {
     display: flex;
     gap: 8px;
@@ -547,7 +548,8 @@ input[type="text"]:focus {
     border-color: var(--vscode-focusBorder);
 }
 
-/* Commits compare */
+/* Files, Commits compare */
+.files-compare,
 .commits-compare {
     display: flex;
     align-items: center;
@@ -559,6 +561,7 @@ input[type="text"]:focus {
     color: var(--vscode-descriptionForeground);
 }
 
+.files-compare .compare-select,
 .commits-compare .compare-select {
     padding: 4px 8px;
     border: 1px solid var(--vscode-input-border);
@@ -566,7 +569,7 @@ input[type="text"]:focus {
     color: var(--vscode-input-foreground);
     border-radius: 3px;
     font-size: 12px;
-    max-width: 235px;
+    width: 100%;
 }
 
 .commits-compare .compare-select:focus {

@@ -41,6 +41,27 @@ class SearchManager {
                 this.handleCommitsCompareChange(e.target.value);
             });
         }
+
+        // Files search
+        const filesSearchInput = document.getElementById('filesSearch');
+        console.log('Setting up files search input:', !!filesSearchInput);
+        if (filesSearchInput) {
+            filesSearchInput.addEventListener('input', (e) => {
+                console.log('Files search input changed:', e.target.value);
+                this.panel.filesSearchTerm = e.target.value;
+                this.debounce(() => this.filterFiles(), 300);
+            });
+        } else {
+            console.error('Files search input not found!');
+        }
+
+        // Files compare filter
+        const filesCompareFilter = document.getElementById('filesCompareFilter');
+        if (filesCompareFilter) {
+            filesCompareFilter.addEventListener('change', (e) => {
+                this.handleFilesCompareChange(e.target.value);
+            });
+        }
     }
 
     filterBranches() {
@@ -81,6 +102,39 @@ class SearchManager {
             console.log('commitsContent element not found');
         }
     }
+
+    filterFiles() {
+        console.log('Filtering files with search term:', this.panel.filesSearchTerm);
+        console.log('Current files available:', this.panel.currentFiles?.length || 0);
+        const filesContent = document.getElementById('filesContent');
+        console.log('filesContent element found:', !!filesContent);
+        if (filesContent && this.panel.currentFiles) {
+            // Filter files based on search term
+            const filteredFiles = this.filterFilesByCriteria(this.panel.currentFiles, this.panel.filesSearchTerm);
+            console.log('Filtered files result:', filteredFiles.length, 'files');
+            
+            // If searching and no results, show search-specific message
+            if (this.panel.filesSearchTerm && this.panel.filesSearchTerm.length > 0 && filteredFiles.length === 0) {
+                const searchMessageHtml = `
+                    <div class="file-changes-container">
+                        <div class="file-changes-tree">
+                            <div class="empty-state"><h3>No such file in change list</h3></div>
+                        </div>
+                        <div class="commit-details">
+                            ${this.panel.uiRenderer.generateCommitDetailsHtml(this.panel.selectedCommit)}
+                        </div>
+                    </div>
+                `;
+                filesContent.innerHTML = searchMessageHtml;
+            } else {
+                const newHtml = this.panel.uiRenderer.generateFileChangesLayout(this.panel.selectedCommit, filteredFiles);
+                filesContent.innerHTML = newHtml;
+            }
+            console.log('Updated files content with', filteredFiles.length, 'filtered files');
+        } else {
+            console.log('filesContent element not found or no current files');
+        }
+    }
     
     filterCommitsByCriteria(commits, searchTerm, selectedUser) {
         if (!commits) return [];
@@ -102,6 +156,50 @@ class SearchManager {
         }
         
         return filtered;
+    }
+
+    filterFilesByCriteria(files, searchTerm) {
+        if (!files || !searchTerm || searchTerm.length === 0) {
+            return files || [];
+        }
+        
+        const searchLower = searchTerm.toLowerCase();
+        const filteredFiles = [];
+        const matchedPaths = new Set();
+        
+        // First pass: find all files that match the search term
+        files.forEach(file => {
+            const filePath = file.file.toLowerCase();
+            if (filePath.includes(searchLower)) {
+                filteredFiles.push(file);
+                matchedPaths.add(file.file);
+            }
+        });
+        
+        // Second pass: add all files that are in parent directories of matched files
+        files.forEach(file => {
+            const filePath = file.file;
+            const pathParts = filePath.split('/');
+            
+            // Check if this file is a parent directory of any matched file
+            for (let i = 1; i <= pathParts.length; i++) {
+                const currentPath = pathParts.slice(0, i).join('/');
+                if (matchedPaths.has(currentPath)) {
+                    // This file is either a match or a parent of a match
+                    if (!filteredFiles.some(f => f.file === filePath)) {
+                        filteredFiles.push(file);
+                    }
+                    break;
+                }
+            }
+        });
+        
+        // Remove duplicates and sort
+        const uniqueFiles = filteredFiles.filter((file, index, self) => 
+            index === self.findIndex(f => f.file === file.file)
+        );
+        
+        return uniqueFiles.sort((a, b) => a.file.localeCompare(b.file));
     }
 
     handleCommitsCompareChange(branchName) {
@@ -153,6 +251,11 @@ class SearchManager {
         }
     }
 
+    handleFilesCompareChange(value) {
+        console.log('Files compare changed to:', value);
+        this.panel.changeCompareOptionSingle(value);
+    }
+
     expandAllSections() {
         // Expand all collapsible sections when searching
         const sections = document.querySelectorAll('.tree-section-content');
@@ -175,6 +278,7 @@ class SearchManager {
     clearAllFilters() {
         this.panel.searchTerm = '';
         this.panel.commitsSearchTerm = '';
+        this.panel.filesSearchTerm = '';
         this.panel.selectedUser = 'all';
         
         // Update UI elements
@@ -188,6 +292,11 @@ class SearchManager {
             commitsSearchInput.value = '';
         }
         
+        const filesSearchInput = document.getElementById('filesSearch');
+        if (filesSearchInput) {
+            filesSearchInput.value = '';
+        }
+        
         const userFilter = document.getElementById('userFilter');
         if (userFilter) {
             userFilter.value = 'all';
@@ -196,6 +305,24 @@ class SearchManager {
         // Refresh content
         this.filterBranches();
         this.filterCommits();
+        this.filterFiles();
+    }
+
+    populateFilesCompareFilter() {
+        const filesCompareFilter = document.getElementById('filesCompareFilter');
+        if (!filesCompareFilter || !this.panel.branches) return;
+        
+        // Clear existing branch options (keep the first 3 default options)
+        const defaultOptions = filesCompareFilter.querySelectorAll('option:not([value="previous"]):not([value="working"]):not([disabled])');
+        defaultOptions.forEach(option => option.remove());
+        
+        // Add branch options
+        this.panel.branches.forEach(branch => {
+            const option = document.createElement('option');
+            option.value = `branch:${branch.name}`;
+            option.textContent = branch.name;
+            filesCompareFilter.appendChild(option);
+        });
     }
 
     // Get current search state
@@ -203,6 +330,7 @@ class SearchManager {
         return {
             branchesSearchTerm: this.panel.searchTerm,
             commitsSearchTerm: this.panel.commitsSearchTerm,
+            filesSearchTerm: this.panel.filesSearchTerm,
             selectedUser: this.panel.selectedUser,
             compareAgainst: this.panel.commitsCompareAgainst
         };
@@ -213,6 +341,7 @@ class SearchManager {
         if (state) {
             this.panel.searchTerm = state.branchesSearchTerm || '';
             this.panel.commitsSearchTerm = state.commitsSearchTerm || '';
+            this.panel.filesSearchTerm = state.filesSearchTerm || '';
             this.panel.selectedUser = state.selectedUser || 'all';
             this.panel.commitsCompareAgainst = state.compareAgainst || 'none';
             
@@ -225,6 +354,11 @@ class SearchManager {
             const commitsSearchInput = document.getElementById('commitsSearch');
             if (commitsSearchInput) {
                 commitsSearchInput.value = this.panel.commitsSearchTerm;
+            }
+            
+            const filesSearchInput = document.getElementById('filesSearch');
+            if (filesSearchInput) {
+                filesSearchInput.value = this.panel.filesSearchTerm;
             }
             
             const userFilter = document.getElementById('userFilter');

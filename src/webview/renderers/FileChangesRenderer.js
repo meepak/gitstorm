@@ -6,19 +6,22 @@ class FileChangesRenderer {
 
     generateFileChangesLayout(commit, files) {
         // Generate file tree HTML
-        const fileTreeHtml = files && files.length > 0 
-            ? this.generateFileTreeHtml(files, commit)
-            : '<div class="empty-state"><h3>No selection</h3><p>Select a commit to view file changes, or <a href="#" onclick="showWorkingDirectoryChanges()">view working directory changes</a></p></div>';
+        let fileTreeHtml;
+        if (files && files.length > 0) {
+            fileTreeHtml = this.generateFileTreeHtml(files, commit);
+        } else if (commit) {
+            // Commit is selected but no files
+            fileTreeHtml = '<div class="empty-state"><h3>Selected commit have no changes to display</h3></div>';
+        } else {
+            // No commit selected
+            fileTreeHtml = '<div class="empty-state"><h3>Select a commit to view changes</h3></div>';
+        }
         
         // Generate commit details - pass commit even if null for multiple commits handling
         const commitDetailsHtml = this.generateCommitDetailsHtml(commit);
 
-        // Generate compare against header
-        const compareHeaderHtml = this.generateCompareHeaderHtml();
-
         return `
             <div class="file-changes-container">
-                ${compareHeaderHtml}
                 <div class="file-changes-tree">
                     ${fileTreeHtml}
                 </div>

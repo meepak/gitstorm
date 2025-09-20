@@ -96,6 +96,15 @@ function clearCommitsSearch() {
     }
 }
 
+function clearFilesSearch() {
+    const input = document.getElementById('filesSearch');
+    if (input) {
+        input.value = '';
+        panelController.filesSearchTerm = '';
+        panelController.searchManager.filterFiles();
+    }
+}
+
 // Utility functions
 function refreshData() {
     panelController.refreshData();
@@ -199,6 +208,7 @@ window.showPanelContextMenu = showPanelContextMenu;
 window.clearSearch = clearSearch;
 window.clearBranchesSearch = clearBranchesSearch;
 window.clearCommitsSearch = clearCommitsSearch;
+window.clearFilesSearch = clearFilesSearch;
 window.refreshData = refreshData;
 window.togglePanel = togglePanel;
 window.showWorkingDirectoryChanges = showWorkingDirectoryChanges;

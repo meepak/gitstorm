@@ -8,7 +8,10 @@ class PanelController {
         this.branches = [];
         this.searchTerm = '';
         this.commitsSearchTerm = '';
+        this.filesSearchTerm = '';
         this.selectedUser = 'all';
+        this.currentFiles = [];
+        this.selectedCommit = null;
         // Load saved panel sizes or use defaults
         const savedSizes = localStorage.getItem('gitstorm-panel-sizes');
         this.panelSizes = savedSizes ? JSON.parse(savedSizes) : { branches: 280, commits: 400, files: 300 };
@@ -312,6 +315,7 @@ class PanelController {
     // File changes methods
     showCommitFileChanges(hash) {
         console.log('Showing file changes for commit:', hash);
+        this.selectedCommit = this.commits.find(c => c.hash === hash) || null;
         this.vscode.postMessage({
             command: 'getCommitDetails',
             hash: hash,

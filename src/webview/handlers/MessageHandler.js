@@ -90,6 +90,10 @@ class MessageHandler {
             filesData: files
         });
         
+        // Store current files for search functionality
+        this.panel.currentFiles = files || [];
+        this.panel.selectedCommit = commit;
+        
         const filesContent = document.getElementById('filesContent');
         console.log('filesContent element found:', !!filesContent);
         
@@ -148,6 +152,10 @@ class MessageHandler {
     }
 
     handleMultiCommitFiles(files) {
+        // Store current files for search functionality
+        this.panel.currentFiles = files || [];
+        this.panel.selectedCommit = null; // Multiple commits selected
+        
         const filesContent = document.getElementById('filesContent');
         if (filesContent && files) {
             // Use layout method to ensure header and footer are shown

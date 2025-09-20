@@ -61,12 +61,29 @@
         </div>
         
         <div id="filesPanel" class="panel files-panel">
-            <div class="panel-header" oncontextmenu="event.preventDefault(); showPanelContextMenu(event, 'files')">File Changes</div>
+            <div class="panel-header" oncontextmenu="event.preventDefault(); showPanelContextMenu(event, 'files')">
+                <span>CHANGES</span>
+                <div class="search-container">
+                    <input type="text" id="filesSearch" placeholder="Search files..." />
+                    <button class="clear-search" onclick="clearFilesSearch()" title="Clear search">×</button>
+                </div>
+            </div>
             <div class="panel-content">
-                <div id="filesContent">
-                    <div class="empty-state">
-                        <h3>No selection</h3>
-                        <p>Select a commit to view file changes, or <a href="#" onclick="showWorkingDirectoryChanges()">view working directory changes</a></p>
+                <div class="files-header">
+                    <div class="files-filters">
+                        <div class="files-compare">
+                            <span class="compare-icon">🔄</span>
+                            <select id="filesCompareFilter" class="compare-select">
+                                <option value="previous">Previous Commit</option>
+                                <option value="working">Current Working Directory</option>
+                                <option value="" disabled style="font-style: italic; color: #666;">Select Branch to Compare</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="files-content">
+                    <div id="filesContent">
+                        <div class="empty-state"><h3>Select a commit to view changes</h3></div>
                     </div>
                 </div>
             </div>
