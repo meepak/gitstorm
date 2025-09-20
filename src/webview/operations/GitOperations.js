@@ -39,11 +39,21 @@ class GitOperations {
     }
 
     showFileDiff(fileName, commitHash) {
+        // For uncommitted changes (when commitHash is null), always use working directory comparison
+        let compareAgainst = this.panel.compareAgainst || 'previous';
+        let compareBranch = this.panel.selectedCompareBranch || null;
+        
+        if (commitHash === null) {
+            // This is for uncommitted changes, use working directory comparison
+            compareAgainst = 'working';
+            compareBranch = null;
+        }
+        
         this.panel.messageHandler.sendMessage('showFileDiff', { 
             filePath: fileName, 
             commitHash,
-            compareAgainst: this.panel.compareAgainst || 'previous',
-            compareBranch: this.panel.selectedCompareBranch || null
+            compareAgainst: compareAgainst,
+            compareBranch: compareBranch
         });
     }
 
@@ -231,8 +241,23 @@ class GitOperations {
         // Clear diff viewer when uncommitted changes are selected
         this.panel.clearDiffViewer();
         
-        // Show uncommitted changes in file panel
-        this.panel.messageHandler.sendMessage('getUncommittedChanges');
+        // Show uncommitted changes (both uncommitted and staged) in file panel
+        this.loadWorkingChanges();
+    }
+
+    async loadWorkingChanges() {
+        try {
+            // Load both uncommitted and staged changes
+            this.panel.messageHandler.sendMessage('getUncommittedChanges');
+            this.panel.messageHandler.sendMessage('getStagedChanges');
+        } catch (error) {
+            console.error('Error loading uncommitted changes:', error);
+        }
+    }
+
+    updateWorkingChangesUI() {
+        // This will be called after both uncommitted and staged changes are loaded
+        // The actual UI update will happen in the message handlers
     }
 
     commitChanges() {
@@ -242,6 +267,151 @@ class GitOperations {
                 message: message.trim() 
             });
         }
+    }
+
+    // New methods for staging and stashing
+    stageAllChanges() {
+        console.log('Staging all changes');
+        this.panel.messageHandler.sendMessage('stageAllChanges');
+    }
+
+    stashChanges() {
+        console.log('Stashing changes');
+        const message = prompt('Enter stash message (optional):');
+        this.panel.messageHandler.sendMessage('stashChanges', { 
+            message: message ? message.trim() : undefined 
+        });
+    }
+
+    unstageAllChanges() {
+        console.log('Unstaging all changes');
+        this.panel.messageHandler.sendMessage('unstageAllChanges');
+    }
+
+    stageFile(filePath) {
+        console.log('Staging file:', filePath);
+        console.log('This should remove the file from uncommitted changes and add it to staged changes');
+        this.panel.messageHandler.sendMessage('stageFile', { filePath });
+    }
+
+    unstageFile(filePath) {
+        console.log('Unstaging file:', filePath);
+        console.log('This should remove the file from staged changes and add it to uncommitted changes');
+        this.panel.messageHandler.sendMessage('unstageFile', { filePath });
+    }
+
+    revertFile(filePath) {
+        console.log('Reverting file:', filePath);
+        const dialog = this.getConfirmationDialog();
+        if (dialog) {
+            dialog.show(
+                `Are you sure you want to revert changes to "${filePath}"?`,
+                'Revert File',
+                {
+                    confirmText: 'Revert',
+                    confirmButtonClass: 'danger-btn'
+                },
+                (confirmed) => {
+                    if (confirmed) {
+                        this.panel.messageHandler.sendMessage('revertFile', { filePath });
+                    }
+                }
+            );
+        } else {
+            console.error('ConfirmationDialog not available');
+        }
+    }
+
+    pushCommit(commitHash) {
+        console.log('Pushing commit:', commitHash);
+        this.panel.messageHandler.sendMessage('pushCommit', { commitHash });
+    }
+
+    // Commit popup functionality
+    showCommitPopup() {
+        console.log('Showing commit popup');
+        this.createCommitPopup();
+    }
+
+    createCommitPopup() {
+        // Remove existing popup if any
+        const existingPopup = document.getElementById('commitPopup');
+        if (existingPopup) {
+            existingPopup.remove();
+        }
+
+        // Create popup
+        const popup = document.createElement('div');
+        popup.id = 'commitPopup';
+        popup.className = 'commit-popup';
+        popup.innerHTML = `
+            <div class="commit-popup-content">
+                <div class="commit-popup-header">
+                    <div class="commit-popup-title">Commit Changes</div>
+                    <button class="commit-popup-close" onclick="this.closest('.commit-popup').remove()">×</button>
+                </div>
+                <div class="commit-popup-body">
+                    <textarea class="commit-popup-message" placeholder="Enter commit message..." id="commitMessage"></textarea>
+                </div>
+                <div class="commit-popup-footer">
+                    <button class="commit-popup-btn secondary" onclick="this.closest('.commit-popup').remove()">Cancel</button>
+                    <button class="commit-popup-btn primary" onclick="window.gitOperations.commitStagedChanges()">Commit</button>
+                    <button class="commit-popup-btn primary" onclick="window.gitOperations.commitAndPushStagedChanges()">Commit & Push</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(popup);
+
+        // Focus on textarea
+        setTimeout(() => {
+            const textarea = document.getElementById('commitMessage');
+            if (textarea) {
+                textarea.focus();
+            }
+        }, 100);
+
+        // Close on escape key
+        const handleKeydown = (e) => {
+            if (e.key === 'Escape') {
+                popup.remove();
+                document.removeEventListener('keydown', handleKeydown);
+            }
+        };
+        document.addEventListener('keydown', handleKeydown);
+    }
+
+    commitStagedChanges() {
+        const message = document.getElementById('commitMessage').value.trim();
+        if (message) {
+            this.panel.messageHandler.sendMessage('commitStagedChanges', { message });
+            document.getElementById('commitPopup').remove();
+        } else {
+            alert('Please enter a commit message');
+        }
+    }
+
+    commitAndPushStagedChanges() {
+        const message = document.getElementById('commitMessage').value.trim();
+        if (message) {
+            this.panel.messageHandler.sendMessage('commitAndPushStagedChanges', { message });
+            document.getElementById('commitPopup').remove();
+        } else {
+            alert('Please enter a commit message');
+        }
+    }
+
+    selectStagedChanges() {
+        console.log('Selecting staged changes');
+        this.panel.selectedCommits.clear();
+        this.panel.selectedCommits.add('staged');
+        this.panel.updateCommitSelection();
+        
+        // Clear diff viewer when staged changes are selected
+        this.panel.clearDiffViewer();
+        
+        // Show staged changes in file panel
+        this.panel.messageHandler.sendMessage('getStagedChanges');
     }
 
     // Squash dialog functionality
@@ -304,15 +474,20 @@ class GitOperations {
         // Show file diff based on comparison mode
         if (compareAgainst === 'working') {
             // For working directory comparison, show diff between commit and working directory
-            this.showFileDiffWithWorking(fileName, commitHash);
+            // But not for uncommitted changes - those should use regular showFileDiff
+            if (commitHash === 'WORKING_DIRECTORY' || commitHash === 'uncommitted') {
+                this.showFileDiff(fileName, null);
+            } else {
+                this.showFileDiffWithWorking(fileName, commitHash);
+            }
         } else if (compareAgainst === 'branch') {
             // For branch comparison, show diff between commit and branch
             this.showFileDiffWithBranch(fileName, commitHash);
         } else {
             // Default: compare against previous commit
-            if (commitHash && commitHash !== 'uncommitted' && commitHash !== 'comparison') {
+            if (commitHash && commitHash !== 'uncommitted' && commitHash !== 'WORKING_DIRECTORY' && commitHash !== 'comparison') {
                 this.showFileDiff(fileName, commitHash);
-            } else if (commitHash === 'uncommitted') {
+            } else if (commitHash === 'uncommitted' || commitHash === 'WORKING_DIRECTORY') {
                 // For uncommitted changes, show the diff
                 this.showFileDiff(fileName, null);
             } else if (commitHash === 'comparison') {
@@ -403,3 +578,47 @@ class GitOperations {
         console.log('Progress completed');
     }
 }
+
+// Global functions for HTML onclick handlers
+window.selectStagedChanges = function() {
+    if (window.panelController && window.panelController.gitOperations) {
+        window.panelController.gitOperations.selectStagedChanges();
+    }
+};
+
+window.showStagedChangesContextMenu = function(event) {
+    if (window.panelController && window.panelController.contextMenuHandler) {
+        window.panelController.contextMenuHandler.showContextMenu(event.clientX, event.clientY, 'staged', {});
+    }
+};
+
+window.stageFile = function(filePath) {
+    if (window.panelController && window.panelController.gitOperations) {
+        window.panelController.gitOperations.stageFile(filePath);
+    }
+};
+
+window.unstageFile = function(filePath) {
+    if (window.panelController && window.panelController.gitOperations) {
+        window.panelController.gitOperations.unstageFile(filePath);
+    }
+};
+
+window.revertFile = function(filePath) {
+    if (window.panelController && window.panelController.gitOperations) {
+        window.panelController.gitOperations.revertFile(filePath);
+    }
+};
+
+// Global function for commit context menu
+window.showCommitContextMenu = function(event, commitHash, isLocal = false) {
+    if (window.panelController && window.panelController.contextMenuHandler) {
+        window.panelController.contextMenuHandler.showContextMenu(event.clientX, event.clientY, 'commit', { 
+            commitHash: commitHash,
+            isLocal: isLocal
+        });
+    }
+};
+
+// Make gitOperations available globally for popup callbacks
+window.gitOperations = null;

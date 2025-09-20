@@ -127,7 +127,13 @@ class SearchManager {
                 // Update the footer separately
                 const filesFooter = document.getElementById('filesFooter');
                 if (filesFooter) {
-                    filesFooter.innerHTML = this.panel.uiRenderer.generateCommitDetailsHtml(this.panel.selectedCommit);
+                    // Hide footer for uncommitted changes, show for others
+                    if (this.panel.selectedCommit && (this.panel.selectedCommit.hash === 'WORKING_DIRECTORY' || this.panel.selectedCommit.hash === 'uncommitted')) {
+                        filesFooter.style.display = 'none';
+                    } else {
+                        filesFooter.style.display = 'block';
+                        filesFooter.innerHTML = this.panel.uiRenderer.generateCommitDetailsHtml(this.panel.selectedCommit);
+                    }
                 }
             } else {
                 const newHtml = this.panel.uiRenderer.generateFileChangesLayout(this.panel.selectedCommit, filteredFiles);
@@ -136,7 +142,13 @@ class SearchManager {
                 // Update the footer separately
                 const filesFooter = document.getElementById('filesFooter');
                 if (filesFooter) {
-                    filesFooter.innerHTML = this.panel.uiRenderer.generateCommitDetailsHtml(this.panel.selectedCommit);
+                    // Hide footer for uncommitted changes, show for others
+                    if (this.panel.selectedCommit && (this.panel.selectedCommit.hash === 'WORKING_DIRECTORY' || this.panel.selectedCommit.hash === 'uncommitted')) {
+                        filesFooter.style.display = 'none';
+                    } else {
+                        filesFooter.style.display = 'block';
+                        filesFooter.innerHTML = this.panel.uiRenderer.generateCommitDetailsHtml(this.panel.selectedCommit);
+                    }
                 }
             }
             console.log('Updated files content with', filteredFiles.length, 'filtered files');

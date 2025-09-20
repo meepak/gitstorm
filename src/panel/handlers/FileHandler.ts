@@ -11,8 +11,13 @@ export class FileHandler {
             console.log('🚀🚀🚀 All parameters received:', { filePath, commitHash, parentIndex, compareAgainst, compareBranch });
             
             // Route to appropriate method based on comparison mode
-            if (compareAgainst === 'working' && commitHash) {
-                await this.handleShowFileDiffWithWorking(filePath, commitHash);
+            if (compareAgainst === 'working') {
+                if (commitHash) {
+                    await this.handleShowFileDiffWithWorking(filePath, commitHash);
+                } else {
+                    // For uncommitted changes, show diff between HEAD and working directory
+                    await this.handleShowFileDiffWithWorking(filePath, 'HEAD');
+                }
                 return;
             } else if (compareAgainst === 'branch' && commitHash) {
                 await this.handleShowFileDiffWithBranch(filePath, commitHash, compareBranch);
@@ -26,9 +31,9 @@ export class FileHandler {
                 diff = await this.panel.gitService.getFileDiff(commitHash, filePath);
                 console.log('Diff result length:', diff ? diff.length : 'null/undefined');
             } else {
-                // Show working directory diff
+                // Show working directory diff (uncommitted changes)
                 console.log('Getting working directory diff for file:', filePath);
-                diff = await this.panel.gitService.getFileDiff('HEAD', filePath);
+                diff = await this.panel.gitService.getFileDiffRange('HEAD..', filePath);
                 console.log('Working diff result length:', diff ? diff.length : 'null/undefined');
             }
             
@@ -112,8 +117,8 @@ export class FileHandler {
             console.log('🚀🚀🚀 UPDATED FileHandler.handleShowFileDiffWithWorking called for:', filePath, 'commit:', commitHash);
             
             // Handle uncommitted case - this should not happen with the frontend fix, but adding safety check
-            if (commitHash === 'uncommitted') {
-                console.log('🚀🚀🚀 WARNING: Received uncommitted commit hash, this should not happen with multiple commits. Using HEAD instead.');
+            if (commitHash === 'uncommitted' || commitHash === 'WORKING_DIRECTORY') {
+                console.log('🚀🚀🚀 WARNING: Received uncommitted commit hash, this should not happen. Using HEAD instead.');
                 commitHash = 'HEAD';
             }
             
@@ -134,19 +139,52 @@ export class FileHandler {
             }
             
             // Get diff between commit and working directory
-            // We want to show changes in the selected commit compared to working directory
-            // So we use commitHash..HEAD to show changes from commit to working directory
-            // But we need to reverse the diff to show from working directory to commit
-            const diff = await this.panel.gitService.getFileDiffRange(`${commitHash}..HEAD`, filePath);
-            console.log('Working directory diff result length:', diff ? diff.length : 'null/undefined');
-            
-            // Reverse the diff to show changes from working directory to commit
-            const reversedDiff = this.reverseDiff(diff);
+            let diff;
+            if (commitHash === 'HEAD') {
+                // For uncommitted changes, show diff between HEAD and working directory
+                if (!fileExistsInCommit && fileExistsInWorking) {
+                    // This is a newly added file (untracked)
+                    // Show the entire file content as additions
+                    try {
+                        const fs = require('fs');
+                        const path = require('path');
+                        const fullPath = path.join(this.panel.gitService.getRepoRoot(), filePath);
+                        const fileContent = fs.readFileSync(fullPath, 'utf8');
+                        
+                        // Create a diff showing the entire file as new content
+                        diff = `diff --git a/${filePath} b/${filePath}
+new file mode 100644
+index 0000000..${this.generateHash(fileContent)}
+--- /dev/null
++++ b/${filePath}
+@@ -0,0 +1,${fileContent.split('\n').length} @@
+${fileContent.split('\n').map((line: string) => '+' + line).join('\n')}`;
+                        
+                        console.log('Working directory diff result length (new file):', diff ? diff.length : 'null/undefined');
+                    } catch (error) {
+                        console.error('Error reading new file:', error);
+                        diff = '';
+                    }
+                } else {
+                    // Existing file, show normal diff
+                    diff = await this.panel.gitService.getFileDiffRange('HEAD', filePath);
+                    console.log('Working directory diff result length (existing file):', diff ? diff.length : 'null/undefined');
+                }
+            } else {
+                // For comparing a specific commit with working directory
+                // We want to show changes in the selected commit compared to working directory
+                // So we use commitHash..HEAD to show changes from commit to working directory
+                // But we need to reverse the diff to show from working directory to commit
+                diff = await this.panel.gitService.getFileDiffRange(`${commitHash}..HEAD`, filePath);
+                console.log('Working directory diff result length (commit..HEAD):', diff ? diff.length : 'null/undefined');
+                // Reverse the diff to show changes from working directory to commit
+                diff = this.reverseDiff(diff);
+            }
             
             this.panel.panel.webview.postMessage({
                 command: 'updateFileDiff',
                 file: filePath,
-                diff: reversedDiff
+                diff: diff
             });
         } catch (error) {
             console.error('Error showing file diff with working directory:', error);
@@ -169,6 +207,12 @@ export class FileHandler {
             }
             return line;
         }).join('\n');
+    }
+
+    private generateHash(content: string): string {
+        // Simple hash generation for diff display (not cryptographically secure)
+        const crypto = require('crypto');
+        return crypto.createHash('sha1').update(content).digest('hex').substring(0, 7);
     }
 
     async handleShowFileDiffWithBranch(filePath: string, commitHash: string, compareBranch?: string) {

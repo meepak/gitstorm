@@ -4,20 +4,20 @@ class CommitRenderer {
         this.panel = panelController;
     }
 
-    generateCommitsHtml(commits, searchTerm = '', selectedUser = 'all') {
+    generateCommitsHtml(commits, searchTerm = '', selectedUser = 'all', hasUncommittedChanges = false, hasStagedChanges = false) {
         let html = '';
 
-        // Add uncommitted changes at the top if they exist and we're on the current branch
-        // If no branch is selected, we're viewing the current branch by default
+        // Add uncommitted changes if they exist and we're on the current branch
         const isOnCurrentBranch = !this.panel.currentBranch || this.panel.isCurrentBranch();
         console.log('Uncommitted changes check:', {
-            hasUncommittedChanges: this.panel.hasUncommittedChanges,
+            hasUncommittedChanges: hasUncommittedChanges,
+            hasStagedChanges: hasStagedChanges,
             currentBranch: this.panel.currentBranch,
             isOnCurrentBranch: isOnCurrentBranch,
             branches: this.panel.branches?.map(b => ({ name: b.name, isCurrent: b.isCurrent }))
         });
         
-        if (this.panel.hasUncommittedChanges && isOnCurrentBranch) {
+        if ((hasUncommittedChanges || hasStagedChanges) && isOnCurrentBranch) {
             html += `
                 <div class="commit-item uncommitted-changes" 
                      onclick="selectUncommittedChanges()" 
@@ -72,12 +72,14 @@ class CommitRenderer {
         html += filteredCommits.map(commit => {
             const isSelected = this.panel.selectedCommits.has(commit.hash);
             const selectedClass = isSelected ? 'selected' : '';
+            const isLocalCommit = commit.isLocal || false;
+            const localClass = isLocalCommit ? 'local-commit' : '';
             
             return `
-                <div class="commit-item ${selectedClass}" 
+                <div class="commit-item ${selectedClass} ${localClass}" 
                      data-commit-hash="${commit.hash}"
                      onclick="selectCommit('${commit.hash}', event)" 
-                     oncontextmenu="event.preventDefault(); showCommitContextMenu(event, '${commit.hash}')">
+                     oncontextmenu="event.preventDefault(); showCommitContextMenu(event, '${commit.hash}', ${isLocalCommit})">
                     <div class="commit-graph">
                         <div class="dag-commit"></div>
                     </div>
@@ -85,6 +87,7 @@ class CommitRenderer {
                         <div>
                             <span class="commit-hash has-tooltip" data-full-hash="${commit.hash}" title="${commit.hash}">${commit.shortHash}</span>
                             <span class="commit-message has-tooltip" data-full-message="${this.escapeHtml(commit.message)}" title="${this.escapeHtml(commit.message)}">${this.escapeHtml(commit.message)}</span>
+                            ${isLocalCommit ? '<span class="local-indicator" title="Local commit (not pushed)">🚀</span>' : ''}
                         </div>
                         <div class="commit-meta">
                             <span class="commit-author has-tooltip" data-full-author="${this.escapeHtml(commit.author)}" title="${this.escapeHtml(commit.author)}">${this.escapeHtml(commit.author)}</span>

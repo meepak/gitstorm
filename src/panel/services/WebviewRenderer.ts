@@ -15,6 +15,7 @@ export class WebviewRenderer {
         
         // Load JS files
         const jsFiles = [
+            'managers/CacheManager.js',
             'core/PanelController.js',
             'handlers/MessageHandler.js', 
             'handlers/ContextMenuHandler.js',

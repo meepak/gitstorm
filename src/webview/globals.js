@@ -186,10 +186,21 @@ function openWorkingFile(filePath) {
     panelController.gitOperations.openFile(filePath);
 }
 
-// Initialize when DOM is ready
+// Initialize when DOM is ready and all scripts are loaded
 document.addEventListener('DOMContentLoaded', () => {
-    panelController = new PanelController();
-    console.log('GitStorm Panel initialized');
+    // Wait a bit to ensure all scripts are loaded
+    setTimeout(() => {
+        if (typeof CacheManager === 'undefined') {
+            console.error('CacheManager not loaded, retrying...');
+            setTimeout(() => {
+                panelController = new PanelController();
+                console.log('GitStorm Panel initialized');
+            }, 100);
+        } else {
+            panelController = new PanelController();
+            console.log('GitStorm Panel initialized');
+        }
+    }, 50);
 });
 
 // Export for debugging

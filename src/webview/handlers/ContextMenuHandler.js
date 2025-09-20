@@ -71,6 +71,9 @@ class ContextMenuHandler {
             case 'uncommitted':
                 this.showUncommittedChangesContextMenu();
                 break;
+            case 'staged':
+                this.showStagedChangesContextMenu();
+                break;
             case 'text':
                 this.showTextContextMenu();
                 break;
@@ -117,6 +120,11 @@ class ContextMenuHandler {
             this.contextMenu.querySelector('[data-action="squash"]').style.display = 'flex';
         }
         
+        // Show push option for local commits
+        if (this.contextMenuData && this.contextMenuData.data && this.contextMenuData.data.isLocal) {
+            this.contextMenu.querySelector('[data-action="push"]').style.display = 'flex';
+        }
+        
         this.contextMenu.querySelector('[data-action="refresh"]').style.display = 'flex';
     }
 
@@ -143,7 +151,15 @@ class ContextMenuHandler {
 
     showUncommittedChangesContextMenu() {
         // Show uncommitted changes-specific actions
-        this.contextMenu.querySelector('[data-action="commit"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="stage-all"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="stash"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="refresh"]').style.display = 'flex';
+    }
+
+    showStagedChangesContextMenu() {
+        // Show staged changes-specific actions
+        this.contextMenu.querySelector('[data-action="commit-staged"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="unstage-all"]').style.display = 'flex';
         this.contextMenu.querySelector('[data-action="refresh"]').style.display = 'flex';
     }
 
@@ -224,6 +240,31 @@ class ContextMenuHandler {
             case 'commit':
                 if (type === 'uncommitted') {
                     this.panel.gitOperations.commitChanges();
+                }
+                break;
+            case 'stage-all':
+                if (type === 'uncommitted') {
+                    this.panel.gitOperations.stageAllChanges();
+                }
+                break;
+            case 'stash':
+                if (type === 'uncommitted') {
+                    this.panel.gitOperations.stashChanges();
+                }
+                break;
+            case 'commit-staged':
+                if (type === 'staged') {
+                    this.panel.gitOperations.showCommitPopup();
+                }
+                break;
+            case 'unstage-all':
+                if (type === 'staged') {
+                    this.panel.gitOperations.unstageAllChanges();
+                }
+                break;
+            case 'push':
+                if (type === 'commit') {
+                    this.panel.gitOperations.pushCommit(data.commitHash);
                 }
                 break;
             case 'refresh':

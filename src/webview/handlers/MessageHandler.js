@@ -18,9 +18,14 @@ class MessageHandler {
                         branches: message.branches?.length, 
                         commits: message.commits?.length, 
                         error: message.error, 
-                        hasUncommittedChanges: message.hasUncommittedChanges 
+                        hasUncommittedChanges: message.hasUncommittedChanges,
+                        hasStagedChanges: message.hasStagedChanges
                     });
-                    this.panel.updateContent(message.branches, message.commits, message.error, message.hasUncommittedChanges);
+                    // Hide loading states when data arrives
+                    this.panel.hidePanelLoadingStates();
+                    // Stop refresh animation when data arrives
+                    this.panel.stopRefreshAnimation();
+                    this.panel.updateContent(message.branches, message.commits, message.error, message.hasUncommittedChanges, message.hasStagedChanges);
                     break;
                     
                 case 'updatePanelSizes':
@@ -74,7 +79,17 @@ class MessageHandler {
                     
                 case 'error':
                     console.error('Frontend: Received error message:', message.error);
+                    // Stop refresh animation on error
+                    this.panel.stopRefreshAnimation();
                     this.handleError(message.error);
+                    break;
+
+                case 'updateUncommittedChanges':
+                    this.updateUncommittedChangesSection(message.files);
+                    break;
+
+                case 'updateStagedChanges':
+                    this.updateStagedChangesSection(message.files);
                     break;
                     
                 default:
@@ -266,6 +281,42 @@ class MessageHandler {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    updateUncommittedChangesSection(files) {
+        const uncommittedList = document.getElementById('uncommittedChangesList');
+        if (uncommittedList) {
+            if (files && files.length > 0) {
+                const fileTreeHtml = this.panel.uiRenderer.fileChangesRenderer.generateFileTreeHtml(files, { hash: 'uncommitted' });
+                uncommittedList.innerHTML = fileTreeHtml;
+            } else {
+                uncommittedList.innerHTML = '<div class="empty-state">No uncommitted changes</div>';
+            }
+        }
+    }
+
+    updateStagedChangesSection(files) {
+        const stagedList = document.getElementById('stagedChangesList');
+        const commitFooter = document.getElementById('workingChangesFooter');
+        
+        if (stagedList) {
+            if (files && files.length > 0) {
+                const fileTreeHtml = this.panel.uiRenderer.fileChangesRenderer.generateFileTreeHtml(files, { hash: 'staged' });
+                stagedList.innerHTML = fileTreeHtml;
+                
+                // Show commit button when there are staged changes
+                if (commitFooter) {
+                    commitFooter.style.display = 'block';
+                }
+            } else {
+                stagedList.innerHTML = '<div class="empty-state">No staged changes</div>';
+                
+                // Hide commit button when no staged changes
+                if (commitFooter) {
+                    commitFooter.style.display = 'none';
+                }
+            }
+        }
     }
 
     // Method to send messages to extension

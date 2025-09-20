@@ -25,6 +25,16 @@ class PanelController {
         this.selectedFileId = null;
         this.commitsCompareAgainst = localStorage.getItem('gitstorm-commits-compare-against') || 'none';
         this.hasUncommittedChanges = false;
+        this.hasStagedChanges = false;
+        
+        // Initialize cache manager
+        console.log('PanelController: About to create CacheManager...', typeof CacheManager);
+        if (typeof CacheManager === 'undefined') {
+            console.error('PanelController: CacheManager is not defined! Script loading order issue.');
+            throw new Error('CacheManager is not defined. Check script loading order.');
+        }
+        this.cacheManager = new CacheManager(this);
+        console.log('PanelController: CacheManager created successfully');
         
         // Initialize sub-components (UIRenderer first as others depend on it)
         this.uiRenderer = new UIRenderer(this);
@@ -32,6 +42,10 @@ class PanelController {
         this.contextMenuHandler = new ContextMenuHandler(this);
         this.searchManager = new SearchManager(this);
         this.gitOperations = new GitOperations(this);
+        
+        // Make gitOperations globally available
+        window.gitOperations = this.gitOperations;
+        window.panelController = this;
         
         this.initialize();
     }
@@ -51,7 +65,14 @@ class PanelController {
             this.searchManager.setupSearchEventListeners();
         }, 100);
         
-        // Send a test message to the extension
+        // Setup refresh button
+        this.setupRefreshButton();
+        
+        // Load UI immediately with empty state, then load data asynchronously
+        this.loadUIWithEmptyState();
+        this.loadDataAsynchronously();
+        
+        // Send a test message to the extension (for debugging)
         this.vscode.postMessage({ command: 'test', data: 'WebView is ready' });
     }
 
@@ -59,6 +80,20 @@ class PanelController {
         // Basic event listeners for resize and general UI
         window.addEventListener('resize', () => {
             this.restorePanelSizes();
+        });
+        
+        // Handle visibility changes to refresh data when panel becomes visible
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                console.log('Panel became visible, checking if data needs refresh...');
+                this.cacheManager.handleVisibilityChange();
+            }
+        });
+        
+        // Handle focus events as backup for visibility detection
+        window.addEventListener('focus', () => {
+            console.log('Window focused, checking if data needs refresh...');
+            this.cacheManager.handleVisibilityChange();
         });
     }
 
@@ -155,12 +190,13 @@ class PanelController {
     }
 
     // Main update content method - delegates to UI renderer
-    updateContent(branches, commits, error, hasUncommittedChanges = false) {
+    updateContent(branches, commits, error, hasUncommittedChanges = false, hasStagedChanges = false) {
         console.log('Updating content:', { 
             branches: branches?.length, 
             commits: commits?.length, 
             error, 
             hasUncommittedChanges,
+            hasStagedChanges,
             currentBranch: this.currentBranch
         });
         
@@ -173,11 +209,18 @@ class PanelController {
             console.log('Selected branch (what you\'re viewing):', this.currentBranch);
         }
 
-        // Store uncommitted changes state
+        // Store uncommitted and staged changes state
         this.hasUncommittedChanges = hasUncommittedChanges;
+        this.hasStagedChanges = hasStagedChanges;
+        
+        // Cache the data for persistence
+        this.cacheManager.cacheData(branches, commits, hasUncommittedChanges, hasStagedChanges);
+        
+        // Cache dropdown data for smooth UI
+        this.cacheManager.cacheDropdownData(commits, branches);
         
         // Delegate to UI renderer
-        this.uiRenderer.updateContent(branches, commits, error, hasUncommittedChanges);
+        this.uiRenderer.updateContent(branches, commits, error, hasUncommittedChanges, hasStagedChanges);
         
         // Ensure compare dropdown state is restored after content update
         setTimeout(() => {
@@ -187,7 +230,24 @@ class PanelController {
 
     // Public methods that other components can call
     refreshData() {
-        this.vscode.postMessage({ command: 'refresh' });
+        // Check if there's a compare option selected for commits
+        if (this.commitsCompareAgainst && this.commitsCompareAgainst !== 'none') {
+            console.log('Refresh with compare option:', {
+                selectedBranch: this.currentBranch,
+                compareBranch: this.commitsCompareAgainst,
+                willShow: `commits in ${this.currentBranch} but not in ${this.commitsCompareAgainst}`
+            });
+            // Use compare functionality for refresh
+            this.vscode.postMessage({
+                command: 'getCommitsWithCompare',
+                branch: this.currentBranch,
+                compareBranch: this.commitsCompareAgainst
+            });
+        } else {
+            console.log('Refresh without compare option - showing all commits');
+            // Regular refresh
+            this.vscode.postMessage({ command: 'refresh' });
+        }
     }
 
     isCurrentBranch() {
@@ -371,14 +431,21 @@ class PanelController {
 
     clearFileChangesPanel() {
         const filesContent = document.getElementById('filesContent');
+        const panelContent = filesContent?.parentElement;
         if (filesContent) {
             // Generate the file changes layout
             const layoutHtml = this.uiRenderer.generateFileChangesLayout(null, []);
             filesContent.innerHTML = layoutHtml;
             
-            // Update the footer separately
+            // Enable panel-content scrolling for regular commits
+            if (panelContent) {
+                panelContent.classList.remove('working-changes-mode');
+            }
+            
+            // Update the footer separately - show for regular commits
             const filesFooter = document.getElementById('filesFooter');
             if (filesFooter) {
+                filesFooter.style.display = 'block';
                 filesFooter.innerHTML = this.uiRenderer.generateCommitDetailsHtml(null);
             }
         }
@@ -495,6 +562,144 @@ class PanelController {
             console.log('Initialized compare dropdown state from localStorage:', this.commitsCompareAgainst);
         }
     }
+
+    // Setup refresh button
+    setupRefreshButton() {
+        const refreshButton = document.getElementById('refreshButton');
+        if (refreshButton) {
+            refreshButton.addEventListener('click', () => {
+                this.startRefreshAnimation();
+                this.refreshData();
+            });
+        }
+    }
+
+    // Load UI with empty state immediately
+    loadUIWithEmptyState() {
+        // Show empty state for each panel
+        const branchesContent = document.getElementById('branchesContent');
+        const commitsContent = document.getElementById('commitsContent');
+        const filesContent = document.getElementById('filesContent');
+        
+        if (branchesContent) {
+            branchesContent.innerHTML = '<div class="empty-state"><h3>Loading branches...</h3></div>';
+        }
+        
+        if (commitsContent) {
+            commitsContent.innerHTML = '<div class="empty-state"><h3>Loading commits...</h3></div>';
+        }
+        
+        if (filesContent) {
+            filesContent.innerHTML = '<div class="empty-state"><h3>Select a commit to view changes</h3></div>';
+        }
+        
+        // Populate dropdowns immediately if we have cached data
+        this.populateDropdownsFromCache();
+    }
+
+    // Load data asynchronously
+    async loadDataAsynchronously() {
+        // Check if we have cached data first
+        const restored = this.cacheManager.restoreCachedData();
+        
+        if (restored) {
+            // Show loading state for each panel
+            this.showPanelLoadingStates();
+            
+            // Restore UI with cached data
+            setTimeout(() => {
+                this.uiRenderer.updateContent(
+                    this.cacheManager.dataCache.branches, 
+                    this.cacheManager.dataCache.commits, 
+                    null, 
+                    this.cacheManager.dataCache.hasUncommittedChanges, 
+                    this.cacheManager.dataCache.hasStagedChanges
+                );
+                
+                // Restore selections and UI state
+                this.cacheManager.restoreUIState();
+                this.hidePanelLoadingStates();
+            }, 100);
+        } else {
+            // No cached data, request fresh data from extension
+            this.showPanelLoadingStates();
+            this.vscode.postMessage({ command: 'refresh' });
+        }
+    }
+
+    // Show loading states for individual panels
+    showPanelLoadingStates() {
+        const branchesPanel = document.getElementById('branchesPanel');
+        const commitsPanel = document.getElementById('commitsPanel');
+        const filesPanel = document.getElementById('filesPanel');
+        
+        if (branchesPanel) {
+            branchesPanel.classList.add('panel-loading');
+        }
+        if (commitsPanel) {
+            commitsPanel.classList.add('panel-loading');
+        }
+        if (filesPanel) {
+            filesPanel.classList.add('panel-loading');
+        }
+    }
+
+    // Hide loading states for individual panels
+    hidePanelLoadingStates() {
+        const branchesPanel = document.getElementById('branchesPanel');
+        const commitsPanel = document.getElementById('commitsPanel');
+        const filesPanel = document.getElementById('filesPanel');
+        
+        if (branchesPanel) {
+            branchesPanel.classList.remove('panel-loading');
+        }
+        if (commitsPanel) {
+            commitsPanel.classList.remove('panel-loading');
+        }
+        if (filesPanel) {
+            filesPanel.classList.remove('panel-loading');
+        }
+    }
+
+    // Populate dropdowns from cache for instant UI
+    populateDropdownsFromCache() {
+        if (this.cacheManager && this.cacheManager.isDropdownCacheValid()) {
+            // Populate user filter
+            this.uiRenderer.filterRenderer.populateUserFilter();
+            
+            // Populate compare filter
+            this.uiRenderer.filterRenderer.populateCommitsCompareFilter();
+            
+            // Populate files compare filter
+            this.uiRenderer.filterRenderer.populateFilesCompareFilter();
+            
+            console.log('All dropdowns populated from cache');
+        }
+    }
+
+    // Start refresh animation
+    startRefreshAnimation() {
+        const refreshButton = document.getElementById('refreshButton');
+        if (refreshButton) {
+            refreshButton.classList.add('refreshing');
+            refreshButton.disabled = true;
+            
+            // Safety timeout to stop animation after 10 seconds
+            setTimeout(() => {
+                this.stopRefreshAnimation();
+            }, 10000);
+        }
+    }
+
+    // Stop refresh animation
+    stopRefreshAnimation() {
+        const refreshButton = document.getElementById('refreshButton');
+        if (refreshButton) {
+            refreshButton.classList.remove('refreshing');
+            refreshButton.disabled = false;
+        }
+    }
+
 }
 
 // Global instance

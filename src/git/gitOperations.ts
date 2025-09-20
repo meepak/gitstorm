@@ -155,8 +155,52 @@ export class GitOperations {
         return this.workingDirOps.getUncommittedChanges();
     }
 
+    async hasStagedChanges(): Promise<boolean> {
+        return this.workingDirOps.hasStagedChanges();
+    }
+
+    async getStagedChanges(): Promise<FileChange[]> {
+        return this.workingDirOps.getStagedChanges();
+    }
+
+    async stageAllChanges(): Promise<boolean> {
+        return this.workingDirOps.stageAllChanges();
+    }
+
+    async stageFile(filePath: string): Promise<boolean> {
+        return this.workingDirOps.stageFile(filePath);
+    }
+
+    async unstageAllChanges(): Promise<boolean> {
+        return this.workingDirOps.unstageAllChanges();
+    }
+
+    async unstageFile(filePath: string): Promise<boolean> {
+        return this.workingDirOps.unstageFile(filePath);
+    }
+
+    async revertFile(filePath: string): Promise<boolean> {
+        return this.workingDirOps.revertFile(filePath);
+    }
+
+    async stashChanges(message?: string): Promise<boolean> {
+        return this.workingDirOps.stashChanges(message);
+    }
+
     async commitChanges(message: string): Promise<boolean> {
         return this.workingDirOps.commitChanges(message);
+    }
+
+    async commitStagedChanges(message: string): Promise<boolean> {
+        return this.workingDirOps.commitStagedChanges(message);
+    }
+
+    async commitAndPushStagedChanges(message: string): Promise<boolean> {
+        return this.workingDirOps.commitAndPushStagedChanges(message);
+    }
+
+    async pushCommit(commitHash: string): Promise<boolean> {
+        return this.workingDirOps.pushCommit(commitHash);
     }
 
     async isGitRepository(): Promise<boolean> {

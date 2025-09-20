@@ -121,8 +121,52 @@ export class GitService {
         return await this.operations.getUncommittedChanges();
     }
 
+    async hasStagedChanges(): Promise<boolean> {
+        return await this.operations.hasStagedChanges();
+    }
+
+    async getStagedChanges(): Promise<FileChange[]> {
+        return await this.operations.getStagedChanges();
+    }
+
+    async stageAllChanges(): Promise<boolean> {
+        return await this.operations.stageAllChanges();
+    }
+
+    async stageFile(filePath: string): Promise<boolean> {
+        return await this.operations.stageFile(filePath);
+    }
+
+    async unstageAllChanges(): Promise<boolean> {
+        return await this.operations.unstageAllChanges();
+    }
+
+    async unstageFile(filePath: string): Promise<boolean> {
+        return await this.operations.unstageFile(filePath);
+    }
+
+    async revertFile(filePath: string): Promise<boolean> {
+        return await this.operations.revertFile(filePath);
+    }
+
+    async stashChanges(message?: string): Promise<boolean> {
+        return await this.operations.stashChanges(message);
+    }
+
     async commitChanges(message: string): Promise<boolean> {
         return await this.operations.commitChanges(message);
+    }
+
+    async commitStagedChanges(message: string): Promise<boolean> {
+        return await this.operations.commitStagedChanges(message);
+    }
+
+    async commitAndPushStagedChanges(message: string): Promise<boolean> {
+        return await this.operations.commitAndPushStagedChanges(message);
+    }
+
+    async pushCommit(commitHash: string): Promise<boolean> {
+        return await this.operations.pushCommit(commitHash);
     }
 
     async getCommitDetailsWithCompare(hash: string, compareBranch: string): Promise<Commit | null> {

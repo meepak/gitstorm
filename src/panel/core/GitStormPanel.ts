@@ -101,18 +101,21 @@ export class GitStormPanel {
             const commits = await this._gitService.getCommits(this._selectedBranch || undefined);
             console.log('Loaded commits:', commits);
 
-            // Check for uncommitted changes if we're on the current branch
+            // Check for uncommitted and staged changes if we're on the current branch
             let hasUncommittedChanges = false;
+            let hasStagedChanges = false;
             const currentBranch = await this._gitService.getCurrentBranch();
             if (currentBranch && (!this._selectedBranch || this._selectedBranch === currentBranch)) {
                 hasUncommittedChanges = await this._gitService.hasUncommittedChanges();
+                hasStagedChanges = await this._gitService.hasStagedChanges();
             }
 
             this._panel.webview.postMessage({
                 command: 'updateContent',
                 branches: branches,
                 commits: commits,
-                hasUncommittedChanges: hasUncommittedChanges
+                hasUncommittedChanges: hasUncommittedChanges,
+                hasStagedChanges: hasStagedChanges
             });
         } catch (error) {
             console.error('Error loading initial data:', error);
@@ -121,7 +124,8 @@ export class GitStormPanel {
                 branches: [],
                 commits: [],
                 error: error instanceof Error ? error.message : 'Unknown error',
-                hasUncommittedChanges: false
+                hasUncommittedChanges: false,
+                hasStagedChanges: false
             });
         }
     }

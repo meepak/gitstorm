@@ -143,6 +143,46 @@ export class MessageHandler {
                     await this._fileHandler.handleOpenFile(message.fileName);
                     break;
 
+                case 'getStagedChanges':
+                    await this._workingDirectoryHandler.handleGetStagedChanges();
+                    break;
+
+                case 'stageAllChanges':
+                    await this._workingDirectoryHandler.handleStageAllChanges();
+                    break;
+
+                case 'stageFile':
+                    await this._workingDirectoryHandler.handleStageFile(message.filePath);
+                    break;
+
+                case 'unstageAllChanges':
+                    await this._workingDirectoryHandler.handleUnstageAllChanges();
+                    break;
+
+                case 'unstageFile':
+                    await this._workingDirectoryHandler.handleUnstageFile(message.filePath);
+                    break;
+
+                case 'revertFile':
+                    await this._workingDirectoryHandler.handleRevertFile(message.filePath);
+                    break;
+
+                case 'stashChanges':
+                    await this._workingDirectoryHandler.handleStashChanges(message.message);
+                    break;
+
+                case 'commitStagedChanges':
+                    await this._workingDirectoryHandler.handleCommitStagedChanges(message.message);
+                    break;
+
+                case 'commitAndPushStagedChanges':
+                    await this._workingDirectoryHandler.handleCommitAndPushStagedChanges(message.message);
+                    break;
+
+                case 'pushCommit':
+                    await this._workingDirectoryHandler.handlePushCommit(message.commitHash);
+                    break;
+
                 default:
                     console.log('Unknown message command:', message.command);
             }

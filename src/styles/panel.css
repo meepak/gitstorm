@@ -129,6 +129,61 @@ body {
     flex-shrink: 0;
 }
 
+.header h1 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.header-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.toolbar-button {
+    background: transparent;
+    border: 1px solid var(--panel-border);
+    color: var(--text-color);
+    padding: 6px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    font-size: 12px;
+}
+
+.toolbar-button:hover {
+    background: var(--button-hover-bg, #3c3c3c);
+    border-color: var(--button-hover-border, #5c5c5c);
+    color: var(--button-hover-fg, #ffffff);
+}
+
+.toolbar-button:active {
+    background: var(--button-active-bg, #4c4c4c);
+    transform: translateY(1px);
+}
+
+.toolbar-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.toolbar-button.refreshing {
+    pointer-events: none;
+}
+
+.toolbar-button.refreshing svg {
+    animation: refresh-spin 1s linear infinite;
+}
+
+@keyframes refresh-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
 .main-content {
     display: flex;
     flex: 1;
@@ -188,6 +243,12 @@ body {
     flex: 1;
     overflow-y: auto;
 }
+
+/* When working changes are displayed, disable panel-content scrolling */
+.panel-content.working-changes-mode {
+    overflow: hidden;
+}
+
 
 .panel-filters {
     display: flex;
@@ -362,17 +423,54 @@ button:hover {
     background-color: var(--charts-orange);
     color: var(--editor-bg);
     font-weight: bold;
+    border: 1px solid var(--charts-orange);
 }
 
 .commit-item.uncommitted-changes:hover {
-    background-color: var(--charts-orange);
-    opacity: 0.8;
+    background-color: var(--charts-blue);
+    border-color: var(--charts-blue);
+    opacity: 0.9;
 }
 
 .commit-item.uncommitted-changes.selected {
-    background-color: var(--charts-orange);
+    background-color: var(--charts-blue);
     color: var(--editor-bg);
+    border-color: var(--charts-blue);
     opacity: 1;
+}
+
+.commit-item.staged-changes {
+    background-color: var(--charts-green);
+    color: var(--editor-bg);
+    font-weight: bold;
+    border: 1px solid var(--charts-green);
+}
+
+.commit-item.staged-changes:hover {
+    background-color: var(--charts-blue);
+    border-color: var(--charts-blue);
+    opacity: 0.9;
+}
+
+.commit-item.staged-changes.selected {
+    background-color: var(--charts-blue);
+    color: var(--editor-bg);
+    border-color: var(--charts-blue);
+    opacity: 1;
+}
+
+.commit-item.local-commit {
+    border-left: 3px solid var(--charts-orange);
+    background-color: var(--list-inactive);
+}
+
+.commit-item.local-commit:hover {
+    background-color: var(--list-hover);
+}
+
+.commit-item.local-commit.selected {
+    background-color: var(--list-active);
+    color: var(--list-active-fg);
 }
 
 /* ===== ICONS & TEXT ===== */
@@ -879,6 +977,239 @@ button:hover {
     margin: var(--spacing-xs) 0;
 }
 
+/* ===== UNCOMMITTED CHANGES LAYOUT ===== */
+.working-changes-container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.working-changes-sections-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.working-changes-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-bottom: 1px solid var(--panel-border);
+}
+
+.working-changes-section:last-of-type {
+    border-bottom: none;
+}
+
+.section-header {
+    background-color: var(--panel-bg);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-bottom: 1px solid var(--panel-border);
+    flex-shrink: 0;
+}
+
+.section-header h3 {
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--foreground);
+    margin: 0;
+}
+
+.section-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-sm);
+    min-height: 0;
+}
+
+.working-changes-footer {
+    background-color: var(--panel-bg);
+    padding: var(--spacing-md);
+    border-top: 1px solid var(--panel-border);
+    flex-shrink: 0;
+    text-align: center;
+}
+
+.commit-button {
+    background-color: var(--button-bg);
+    color: var(--button-fg);
+    border: none;
+    padding: var(--spacing-sm) var(--spacing-lg);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    transition: background-color var(--transition-fast);
+}
+
+.commit-button:hover {
+    background-color: var(--button-hover);
+}
+
+/* ===== FILE ACTION BUTTONS ===== */
+.file-action-buttons {
+    display: none;
+    gap: var(--spacing-xs);
+    margin-left: var(--spacing-sm);
+}
+
+.file-tree-item:hover .file-action-buttons {
+    display: flex;
+}
+
+.file-action-btn {
+    width: 20px;
+    height: 20px;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    transition: all var(--transition-fast);
+    background-color: var(--button-bg);
+    color: var(--button-fg);
+}
+
+.file-action-btn:hover {
+    background-color: var(--button-hover);
+    transform: scale(1.1);
+}
+
+.file-action-btn.stage-btn {
+    background-color: var(--charts-green);
+    color: white;
+}
+
+.file-action-btn.unstage-btn {
+    background-color: var(--charts-orange);
+    color: white;
+}
+
+.file-action-btn.revert-btn {
+    background-color: var(--charts-red);
+    color: white;
+}
+
+/* ===== COMMIT POPUP ===== */
+.commit-popup {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.commit-popup-content {
+    background-color: var(--menu-bg);
+    color: var(--menu-fg);
+    border: 1px solid var(--menu-border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-lg);
+    min-width: 400px;
+    max-width: 600px;
+    box-shadow: var(--widget-shadow);
+}
+
+.commit-popup-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-md);
+}
+
+.commit-popup-title {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.commit-popup-close {
+    background: none;
+    border: none;
+    color: var(--menu-fg);
+    font-size: 20px;
+    cursor: pointer;
+    padding: var(--spacing-xs);
+    border-radius: var(--radius-sm);
+    transition: background-color var(--transition-fast);
+}
+
+.commit-popup-close:hover {
+    background-color: var(--menu-selection-bg);
+}
+
+.commit-popup-body {
+    margin-bottom: var(--spacing-md);
+}
+
+.commit-popup-message {
+    width: 100%;
+    min-height: 100px;
+    padding: var(--spacing-sm);
+    border: 1px solid var(--input-border);
+    background-color: var(--input-bg);
+    color: var(--input-fg);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-family);
+    font-size: var(--font-size);
+    resize: vertical;
+    outline: none;
+}
+
+.commit-popup-message:focus {
+    border-color: var(--focus-border);
+}
+
+.commit-popup-footer {
+    display: flex;
+    gap: var(--spacing-sm);
+    justify-content: flex-end;
+}
+
+.commit-popup-btn {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 12px;
+    transition: background-color var(--transition-fast);
+}
+
+.commit-popup-btn.primary {
+    background-color: var(--button-bg);
+    color: var(--button-fg);
+}
+
+.commit-popup-btn.primary:hover {
+    background-color: var(--button-hover);
+}
+
+.commit-popup-btn.secondary {
+    background-color: var(--list-inactive);
+    color: var(--foreground);
+}
+
+.commit-popup-btn.secondary:hover {
+    background-color: var(--list-hover);
+}
+
+.commit-popup-btn.danger {
+    background-color: var(--charts-red);
+    color: white;
+}
+
+.commit-popup-btn.danger:hover {
+    background-color: #d32f2f;
+}
+
 /* ===== UTILITY CLASSES ===== */
 .hidden { display: none !important; }
 .visible { display: block !important; }
@@ -934,4 +1265,58 @@ button:hover {
         background-color: var(--dropdown-bg, #ffffff);
         color: var(--dropdown-fg, #000000);
     }
+}
+
+/* Loading states for individual panels */
+.panel-loading {
+    position: relative;
+    overflow: hidden;
+}
+
+.panel-loading::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    animation: panel-loading 1.5s infinite;
+    pointer-events: none;
+}
+
+@keyframes panel-loading {
+    0% {
+        left: -100%;
+    }
+    100% {
+        left: 100%;
+    }
+}
+
+.panel-loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+.panel-loading-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--panel-border);
+    border-top: 2px solid var(--accent-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }

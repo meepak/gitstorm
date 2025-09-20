@@ -28,8 +28,11 @@ export function getBranchesHtml(branches: Branch[], selectedBranch: string | nul
             branch.name.toLowerCase().includes(searchTerm.toLowerCase())
         );
 
-        // Separate local and remote branches
-        const localBranches = filteredBranches.filter(branch => branch.isLocal && !branch.isRemote);
+        // Find current branch
+        const currentBranch = filteredBranches.find(branch => branch.isCurrent);
+        
+        // Separate local and remote branches (excluding current branch)
+        const localBranches = filteredBranches.filter(branch => branch.isLocal && !branch.isRemote && !branch.isCurrent);
         const remoteBranches = filteredBranches.filter(branch => branch.isRemote);
 
         // Group remote branches by origin
@@ -44,6 +47,21 @@ export function getBranchesHtml(branches: Branch[], selectedBranch: string | nul
         });
 
         let html = '';
+
+        // Current branch section (at the top)
+        if (currentBranch) {
+            html += `
+                <div class="tree-section">
+                    <div class="tree-section-header" onclick="toggleSection('current')">
+                        <div class="tree-toggle">▼</div>
+                        <div class="tree-section-title">Current</div>
+                    </div>
+                    <div class="tree-section-content" id="current-content">
+                        ${generateBranchItemsHtml([currentBranch], selectedBranch)}
+                    </div>
+                </div>
+            `;
+        }
 
         // Local branches section
         if (localBranches.length > 0) {

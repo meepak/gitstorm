@@ -17,8 +17,11 @@ class BranchRenderer {
             );
         }
 
-        // Separate local and remote branches
-        const localBranches = filteredBranches.filter(branch => !branch.isRemote);
+        // Find current branch
+        const currentBranch = filteredBranches.find(branch => branch.isCurrent);
+        
+        // Separate local and remote branches (excluding current branch)
+        const localBranches = filteredBranches.filter(branch => !branch.isRemote && !branch.isCurrent);
         const remoteBranches = filteredBranches.filter(branch => branch.isRemote);
 
         // Group remote branches by origin
@@ -32,6 +35,20 @@ class BranchRenderer {
         });
 
         let html = '';
+
+        // Current branch section (at the top)
+        if (currentBranch) {
+            html += `
+                <div class="tree-section">
+                    <div class="tree-section-header">
+                        <div class="tree-section-title">Current</div>
+                    </div>
+                    <div class="tree-section-content" id="current-content">
+                        ${this.generateBranchItemsHtml([currentBranch], selectedBranch)}
+                    </div>
+                </div>
+            `;
+        }
 
         // Local branches section
         if (localBranches.length > 0) {
@@ -63,7 +80,7 @@ class BranchRenderer {
         });
 
         // If we have a search term but no results in any section, show message
-        if (searchTerm.length > 0 && localBranches.length === 0 && Object.keys(remoteGroups).length === 0) {
+        if (searchTerm.length > 0 && !currentBranch && localBranches.length === 0 && Object.keys(remoteGroups).length === 0) {
             html = `<div class="empty-state"><h3>No branches match "${searchTerm}"</h3></div>`;
         }
 

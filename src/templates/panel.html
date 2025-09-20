@@ -9,6 +9,15 @@
 <body oncontextmenu="return false;">
     <div class="header">
         <h1>GitStorm</h1>
+        <div class="header-toolbar">
+            <button id="refreshButton" class="toolbar-button" title="Refresh Data">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <polyline points="1 20 1 14 7 14"></polyline>
+                    <path d="m3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+            </button>
+        </div>
     </div>
     
     <div class="main-content">
@@ -163,6 +172,26 @@
             <span class="context-menu-icon">💾</span>
             <span class="context-menu-text">Commit Changes</span>
         </div>
+        <div class="context-menu-item" data-action="stage-all">
+            <span class="context-menu-icon">➕</span>
+            <span class="context-menu-text">Stage All Changes</span>
+        </div>
+        <div class="context-menu-item" data-action="stash">
+            <span class="context-menu-icon">📦</span>
+            <span class="context-menu-text">Stash Changes</span>
+        </div>
+        <div class="context-menu-item" data-action="commit-staged">
+            <span class="context-menu-icon">💾</span>
+            <span class="context-menu-text">Commit Staged Changes</span>
+        </div>
+        <div class="context-menu-item" data-action="unstage-all">
+            <span class="context-menu-icon">➖</span>
+            <span class="context-menu-text">Unstage All Changes</span>
+        </div>
+        <div class="context-menu-item" data-action="push">
+            <span class="context-menu-icon">🚀</span>
+            <span class="context-menu-text">Push Commit</span>
+        </div>
         
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="refresh">
@@ -172,6 +201,7 @@
     </div>
     
     <!-- Load JavaScript modules in correct order -->
+    <script src="managers/CacheManager.js"></script>
     <script src="core/PanelController.js"></script>
     <script src="handlers/MessageHandler.js"></script>
     <script src="handlers/ContextMenuHandler.js"></script>

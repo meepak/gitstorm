@@ -5,7 +5,12 @@ class FileChangesRenderer {
     }
 
     generateFileChangesLayout(commit, files) {
-        // Generate file tree HTML
+        // Check if this is for uncommitted changes (working directory)
+        if (commit && (commit.hash === 'WORKING_DIRECTORY' || commit.hash === 'uncommitted')) {
+            return this.generateWorkingChangesLayout(commit, files);
+        }
+        
+        // Generate file tree HTML for regular commits
         let fileTreeHtml;
         if (files && files.length > 0) {
             fileTreeHtml = this.generateFileTreeHtml(files, commit);
@@ -16,14 +21,39 @@ class FileChangesRenderer {
             // No commit selected
             fileTreeHtml = '<div class="empty-state"><h3>Select a commit to view changes</h3></div>';
         }
-        
-        // Generate commit details - pass commit even if null for multiple commits handling
-        const commitDetailsHtml = this.generateCommitDetailsHtml(commit);
 
         return `
             <div class="file-changes-container">
                 <div class="file-changes-tree">
                     ${fileTreeHtml}
+                </div>
+            </div>
+        `;
+    }
+
+    generateWorkingChangesLayout(commit, files) {
+        // This will be populated with both uncommitted and staged changes
+        return `
+            <div class="working-changes-container">
+                <div class="working-changes-sections-container">
+                    <div class="working-changes-section">
+                        <div class="section-content" id="uncommittedChangesList">
+                            <div class="loading">Loading uncommitted changes...</div>
+                        </div>
+                    </div>
+                    <div class="working-changes-section">
+                        <div class="section-header">
+                            <h3>Staged Changes</h3>
+                        </div>
+                        <div class="section-content" id="stagedChangesList">
+                            <div class="empty-state">No staged changes</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="working-changes-footer" id="workingChangesFooter" style="display: none;">
+                    <button class="commit-button" onclick="window.gitOperations.showCommitPopup()">
+                        Commit Changes
+                    </button>
                 </div>
             </div>
         `;
@@ -120,6 +150,29 @@ class FileChangesRenderer {
                 console.log('🚀🚀🚀 FileChangesRenderer: File', node.file, 'using commit hash:', fileCommitHash, 'node.commitHash:', node.commitHash, 'fallback commitHash:', commitHash);
                 console.log('🚀🚀🚀 FileChangesRenderer: File stats - additions:', node.additions, 'deletions:', node.deletions, 'status:', node.status);
                 
+                // Determine file status and appropriate action buttons
+                const isStaged = node.status === 'staged' || node.staged;
+                const isUncommitted = fileCommitHash === 'uncommitted' || fileCommitHash === 'WORKING_DIRECTORY';
+                const isStagedFile = fileCommitHash === 'staged';
+                
+                let actionButtons = '';
+                if (isUncommitted) {
+                    // For uncommitted files, show stage and revert buttons
+                    actionButtons = `
+                        <div class="file-action-buttons">
+                            <button class="file-action-btn stage-btn" onclick="event.stopPropagation(); stageFile('${node.file}')" title="Stage file">+</button>
+                            <button class="file-action-btn revert-btn" onclick="event.stopPropagation(); revertFile('${node.file}')" title="Revert file">↶</button>
+                        </div>
+                    `;
+                } else if (isStagedFile) {
+                    // For staged files, show unstage button
+                    actionButtons = `
+                        <div class="file-action-buttons">
+                            <button class="file-action-btn unstage-btn" onclick="event.stopPropagation(); unstageFile('${node.file}')" title="Unstage file">-</button>
+                        </div>
+                    `;
+                }
+
                 html += `
                     <div class="file-tree-item file ${statusClass}" 
                          data-file-path="${node.file}"
@@ -129,6 +182,7 @@ class FileChangesRenderer {
                         <div class="file-tree-name">
                             ${this.escapeHtml(node.name)}${changesText ? `<span class="file-changes"> ${changesText}</span>` : ''}
                         </div>
+                        ${actionButtons}
                     </div>
                 `;
             }
