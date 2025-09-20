@@ -14,7 +14,8 @@ function showBranchContextMenu(event, branchName) {
 // Commit operations
 function selectCommit(commitHash, event = null) {
     const isMultiSelect = event && event.ctrlKey;
-    panelController.selectCommit(commitHash, isMultiSelect);
+    const isRangeSelect = event && event.shiftKey;
+    panelController.selectCommit(commitHash, isMultiSelect, isRangeSelect);
 }
 
 function showCommitContextMenu(event, commitHash) {

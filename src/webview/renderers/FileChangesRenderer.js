@@ -25,9 +25,6 @@ class FileChangesRenderer {
                 <div class="file-changes-tree">
                     ${fileTreeHtml}
                 </div>
-                <div class="commit-details">
-                    ${commitDetailsHtml}
-                </div>
             </div>
         `;
     }
@@ -48,7 +45,10 @@ class FileChangesRenderer {
         } else if (comparison) {
             commitHash = 'comparison';
         } else {
-            commitHash = 'uncommitted';
+            // For multiple commits, we'll use the commit hash from each individual file
+            // This will be set per-file in the renderTreeNodes method
+            commitHash = 'multi-commit'; // Placeholder that will be replaced per-file
+            console.log('🚀🚀🚀 FileChangesRenderer: Using multi-commit mode, commit hash will be set per-file');
         }
         
         console.log('🚀🚀🚀 FileChangesRenderer: Final commitHash for file clicks:', commitHash);
@@ -115,11 +115,16 @@ class FileChangesRenderer {
                 const statusClass = this.getStatusClass(node.status);
                 const changesText = this.getFileChangeStats(node);
                 
+                // Use the file's commit hash if available, otherwise use the passed commitHash
+                const fileCommitHash = node.commitHash || commitHash;
+                console.log('🚀🚀🚀 FileChangesRenderer: File', node.file, 'using commit hash:', fileCommitHash, 'node.commitHash:', node.commitHash, 'fallback commitHash:', commitHash);
+                console.log('🚀🚀🚀 FileChangesRenderer: File stats - additions:', node.additions, 'deletions:', node.deletions, 'status:', node.status);
+                
                 html += `
                     <div class="file-tree-item file ${statusClass}" 
                          data-file-path="${node.file}"
-                         onclick="console.log('🚀🚀🚀 File click handler called for:', '${node.file}', 'commit:', '${commitHash}', 'compare against:', '${this.panel.compareAgainst}'); console.log('🚀🚀🚀 selectFile function exists:', typeof selectFile); selectFile('${node.file}', '${commitHash}', '${this.panel.compareAgainst}')" 
-                         oncontextmenu="event.preventDefault(); selectFileOnly('${node.file}'); showFileContextMenu(event, '${node.file}', '${commitHash}')">
+                         onclick="console.log('🚀🚀🚀 File click handler called for:', '${node.file}', 'commit:', '${fileCommitHash}', 'compare against:', '${this.panel.compareAgainst}'); console.log('🚀🚀🚀 selectFile function exists:', typeof selectFile); selectFile('${node.file}', '${fileCommitHash}', '${this.panel.compareAgainst}')" 
+                         oncontextmenu="event.preventDefault(); selectFileOnly('${node.file}'); showFileContextMenu(event, '${node.file}', '${fileCommitHash}')">
                         <div class="file-tree-icon">${fileTypeIcon}</div>
                         <div class="file-tree-name">
                             ${this.escapeHtml(node.name)}${changesText ? `<span class="file-changes"> ${changesText}</span>` : ''}
@@ -133,17 +138,18 @@ class FileChangesRenderer {
     }
 
     generateCompareHeaderHtml() {
-        const selectedCommits = Array.from(this.panel.selectedCommits);
-        const isMultipleCommits = selectedCommits.length > 1;
         
         // Build the single dropdown options
         let dropdownOptions = '';
         
-        // Previous Commit (default)
-        dropdownOptions += `<option value="previous" ${this.panel.compareAgainst === 'previous' ? 'selected' : ''}>Previous Commit</option>`;
+        console.log('****FileChangesRenderer: Generating dropdown with compareAgainst:', this.panel.compareAgainst);
+            
+        // Current Working Directory (default)
+        dropdownOptions += `<option value="working" ${this.panel.compareAgainst === 'working' ? 'selected' : ''}>Current Working Directory</option>`;   
         
-        // Current Working Directory
-        dropdownOptions += `<option value="working" ${this.panel.compareAgainst === 'working' ? 'selected' : ''}>Current Working Directory</option>`;
+        // Previous Commit
+        dropdownOptions += `<option value="previous" ${this.panel.compareAgainst === 'previous' ? 'selected' : ''}>Previous Commit</option>`;
+ 
         
         // Non-selectable separator
         dropdownOptions += `<option value="" disabled style="font-style: italic; color: #666;">Select Branch to Compare</option>`;
@@ -159,7 +165,7 @@ class FileChangesRenderer {
         return `
             <div class="compare-header">
                 <div class="compare-header-content">
-                    <span class="compare-icon">🔄</span>
+                    <span class="compare-icon"  title="Compare against">🔄</span>
                     <select class="compare-select" onchange="changeCompareOptionSingle(this.value)">
                         ${dropdownOptions}
                     </select>
@@ -185,16 +191,22 @@ class FileChangesRenderer {
                 <button class="commit-pagination-btn" onclick="
                     const carousel = document.querySelector('.commit-carousel');
                     const currentPage = parseInt(document.querySelector('.commit-page-info').textContent.split('/')[0]);
+                    console.log('Previous button clicked, currentPage:', currentPage, 'carousel width:', carousel.style.width);
                     if (currentPage > 1) {
-                        carousel.style.transform = 'translateX(' + ((currentPage - 2) * -100) + '%)';
+                        const newTransform = 'translateX(' + ((currentPage - 2) * -100) + '%)';
+                        console.log('Setting transform to:', newTransform);
+                        carousel.style.transform = newTransform;
                         document.querySelector('.commit-page-info').textContent = (currentPage - 1) + '/${selectedCommits.length}';
                     }
                 ">‹</button>
                 <button class="commit-pagination-btn" onclick="
                     const carousel = document.querySelector('.commit-carousel');
                     const currentPage = parseInt(document.querySelector('.commit-page-info').textContent.split('/')[0]);
+                    console.log('Next button clicked, currentPage:', currentPage, 'carousel width:', carousel.style.width);
                     if (currentPage < ${selectedCommits.length}) {
-                        carousel.style.transform = 'translateX(' + (currentPage * -100) + '%)';
+                        const newTransform = 'translateX(' + (currentPage * -100) + '%)';
+                        console.log('Setting transform to:', newTransform);
+                        carousel.style.transform = newTransform;
                         document.querySelector('.commit-page-info').textContent = (currentPage + 1) + '/${selectedCommits.length}';
                     }
                 ">›</button>
@@ -206,15 +218,15 @@ class FileChangesRenderer {
             this.panel.commits.find(c => c.hash === hash) || { hash }
         ) : [commit];
         
-        const commitSlides = allCommits.map(commitData => {
-            const message = commitData.message || '';
-            const hashLength = commitData.hash ? commitData.hash.length : 7;
-            const truncatedMessage = message.length > hashLength ? 
-                this.escapeHtml(message.substring(0, hashLength)) + '...' : 
-                this.escapeHtml(message);
-            const showTooltip = message.length > hashLength;
-            
-            return `
+        console.log('Carousel generation:', {
+            isMultipleCommits,
+            allCommitsLength: allCommits.length,
+            carouselWidth: `${allCommits.length * 100}%`,
+            selectedCommits: selectedCommits
+        });
+        
+        const commitSlides = allCommits.map(commitData => 
+            `
                 <div class="commit-slide">
                     <div class="commit-detail-item">
                         <span class="commit-detail-label">Hash:</span>
@@ -230,22 +242,21 @@ class FileChangesRenderer {
                     </div>
                     <div class="commit-detail-item">
                         <span class="commit-detail-label">Message:</span>
-                        <span class="commit-detail-value message-value ${showTooltip ? 'has-tooltip' : ''}" ${showTooltip ? `title="${this.escapeHtml(message)}"` : ''}>
-                            ${truncatedMessage}
-                            ${showTooltip ? '<span class="message-icon">💬</span>' : ''}
+                        <span class="commit-detail-value message-value has-tooltip" title="${this.escapeHtml(commitData.message)}">
+                            ${commitData.message}
                         </span>
                     </div>
                 </div>
-            `;
-        }).join('');
+            `
+        ).join('');
         
         return `
-            <div class="commit-details-header">
+            <div class="panel-footer-header">
                 <h3>Commit Details</h3>
                 ${paginationButtons}
             </div>
-            <div class="commit-details-content">
-                <div class="commit-carousel">
+            <div class="panel-footer-content">
+                <div class="commit-carousel" style="width: ${allCommits.length * 100}%; transform: translateX(0%)">
                     ${commitSlides}
                 </div>
             </div>

@@ -184,11 +184,22 @@ export class FileOperations {
                 return await this.getFileChangesWithCompare(hashes[0], compareBranch);
             }
 
-            // For multiple commits, create a range from parent of first commit to last commit
-            const firstCommit = hashes[0];
-            const lastCommit = hashes[hashes.length - 1];
-            const diff = await this.git.diff([`${compareBranch}..${lastCommit}`, '--numstat']);
-            return GitParsers.parseFileChanges(diff);
+            // For multiple commits, get files from each commit individually and merge them
+            const allFiles: FileChange[] = [];
+            const fileMap = new Map<string, FileChange>(); // Track unique files with their latest commit
+
+            for (const commitHash of hashes) {
+                const files = await this.getFileChangesWithCompare(commitHash, compareBranch);
+                console.log(`🚀🚀🚀 FileOperations: Processing commit ${commitHash} with ${files.length} files`);
+                for (const file of files) {
+                    // Add commit hash to each file
+                    const fileWithCommit = { ...file, commitHash };
+                    console.log(`🚀🚀🚀 FileOperations: File ${file.file} assigned to commit ${commitHash}`);
+                    fileMap.set(file.file, fileWithCommit);
+                }
+            }
+
+            return Array.from(fileMap.values());
         } catch (error) {
             console.error('Error getting multi-commit files with compare:', error);
             return [];
@@ -207,10 +218,21 @@ export class FileOperations {
                 return await this.getFileChangesWithWorking(hashes[0]);
             }
 
-            // For multiple commits, create a range from parent of first commit to HEAD
-            const firstCommit = hashes[0];
-            const diff = await this.git.diff([`${firstCommit}~1..HEAD`, '--numstat']);
-            return GitParsers.parseFileChanges(diff);
+            // For multiple commits, get files from each commit individually and merge them
+            const fileMap = new Map<string, FileChange>(); // Track unique files with their latest commit
+
+            for (const commitHash of hashes) {
+                const files = await this.getFileChangesWithWorking(commitHash);
+                console.log(`🚀🚀🚀 FileOperations: Processing commit ${commitHash} with ${files.length} files (working directory)`);
+                for (const file of files) {
+                    // Add commit hash to each file
+                    const fileWithCommit = { ...file, commitHash };
+                    console.log(`🚀🚀🚀 FileOperations: File ${file.file} assigned to commit ${commitHash} (working directory)`);
+                    fileMap.set(file.file, fileWithCommit);
+                }
+            }
+
+            return Array.from(fileMap.values());
         } catch (error) {
             console.error('Error getting multi-commit files with working:', error);
             return [];
@@ -230,9 +252,20 @@ export class FileOperations {
 
     async getFileChangesWithWorking(hash: string): Promise<FileChange[]> {
         try {
-            // Get file changes by comparing hash against working directory
-            const diff = await this.git.diff([`${hash}..HEAD`, '--numstat']);
-            return GitParsers.parseFileChanges(diff);
+            // Get file changes by comparing working directory against commit
+            // Using ${hash} shows changes from commit to working directory
+            const diff = await this.git.diff([hash, '--numstat']);
+            const files = GitParsers.parseFileChanges(diff);
+            
+            // Swap additions and deletions to show from working directory's perspective
+            // When git diff shows "X additions, Y deletions" from commit to working dir,
+            // it means X lines were added to working dir and Y lines were deleted from working dir
+            // So we should show X additions and Y deletions from working dir's perspective
+            return files.map(file => ({
+                ...file,
+                additions: file.deletions, // Git's "deletions from commit" = "additions to working dir"
+                deletions: file.additions  // Git's "additions to commit" = "deletions from working dir"
+            }));
         } catch (error) {
             console.error('Error getting file changes with working:', error);
             return [];

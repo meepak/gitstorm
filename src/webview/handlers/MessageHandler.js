@@ -98,9 +98,15 @@ class MessageHandler {
         console.log('filesContent element found:', !!filesContent);
         
         if (filesContent) {
-            // Always use the layout method to ensure header and footer are shown
+            // Generate the file changes layout
             const layoutHtml = this.panel.uiRenderer.generateFileChangesLayout(commit, files);
             filesContent.innerHTML = layoutHtml;
+            
+            // Update the footer separately
+            const filesFooter = document.getElementById('filesFooter');
+            if (filesFooter) {
+                filesFooter.innerHTML = this.panel.uiRenderer.generateCommitDetailsHtml(commit);
+            }
             console.log('Files content updated successfully');
         } else {
             console.error('filesContent element not found!');
@@ -124,7 +130,11 @@ class MessageHandler {
         let formattedHtml = `<div class="diff-header">📄 ${this.escapeHtml(fileName)}</div>`;
         
         lines.forEach(line => {
-            if (line.startsWith('+++') || line.startsWith('---')) {
+            // Git diff headers (these should not be colored as additions/deletions)
+            if (line.startsWith('+++') || line.startsWith('---') || 
+                line.startsWith('diff --git') || line.startsWith('index ') ||
+                line.startsWith('new file') || line.startsWith('deleted file') ||
+                line.startsWith('similarity index') || line.startsWith('rename')) {
                 formattedHtml += `<div class="diff-header">${this.escapeHtml(line)}</div>`;
             } else if (line.startsWith('@@')) {
                 formattedHtml += `<div class="diff-context">${this.escapeHtml(line)}</div>`;
@@ -144,9 +154,15 @@ class MessageHandler {
         if (comparison && comparison.files) {
             const filesContent = document.getElementById('filesContent');
             if (filesContent) {
-                // Use layout method to ensure header and footer are shown
+                // Generate the file changes layout
                 const layoutHtml = this.panel.uiRenderer.generateFileChangesLayout(null, comparison.files);
                 filesContent.innerHTML = layoutHtml;
+                
+                // Update the footer separately
+                const filesFooter = document.getElementById('filesFooter');
+                if (filesFooter) {
+                    filesFooter.innerHTML = this.panel.uiRenderer.generateCommitDetailsHtml(null);
+                }
             }
         }
     }
@@ -158,9 +174,15 @@ class MessageHandler {
         
         const filesContent = document.getElementById('filesContent');
         if (filesContent && files) {
-            // Use layout method to ensure header and footer are shown
+            // Generate the file changes layout
             const layoutHtml = this.panel.uiRenderer.generateFileChangesLayout(null, files);
             filesContent.innerHTML = layoutHtml;
+            
+            // Update the footer separately
+            const filesFooter = document.getElementById('filesFooter');
+            if (filesFooter) {
+                filesFooter.innerHTML = this.panel.uiRenderer.generateCommitDetailsHtml(null);
+            }
         }
     }
 

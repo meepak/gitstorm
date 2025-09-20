@@ -76,4 +76,34 @@ class FilterRenderer {
         
         console.log('Populated compare filter with selection:', compareSelect.value);
     }
+
+    populateFilesCompareFilter() {
+        const filesCompareFilter = document.getElementById('filesCompareFilter');
+        if (!filesCompareFilter || !this.panel.branches) return;
+        
+        // Store current selection
+        const currentSelection = filesCompareFilter.value;
+        
+        // Clear existing branch options (keep the first 3 default options)
+        const defaultOptions = filesCompareFilter.querySelectorAll('option:not([value="working"]):not([value="previous"]):not([disabled])');
+        defaultOptions.forEach(option => option.remove());
+        
+        // Add branch options
+        this.panel.branches.forEach(branch => {
+            const option = document.createElement('option');
+            option.value = `branch:${branch.name}`;
+            option.textContent = branch.name;
+            filesCompareFilter.appendChild(option);
+        });
+        
+        // Restore selection if it still exists
+        if (currentSelection && filesCompareFilter.querySelector(`option[value="${currentSelection}"]`)) {
+            filesCompareFilter.value = currentSelection;
+        } else {
+            // Use the panel's stored compare state
+            filesCompareFilter.value = this.panel.compareAgainst || 'working';
+        }
+        
+        console.log('Populated files compare filter with selection:', filesCompareFilter.value);
+    }
 }

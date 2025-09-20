@@ -36,25 +36,23 @@
                     <button class="clear-search" onclick="clearCommitsSearch()" title="Clear search">×</button>
                 </div>
             </div>
-            <div class="panel-content">
-                <div class="commits-header">
-                    <div class="commits-filters">
-                        <select id="userFilter" class="user-filter">
-                            <option value="all">All Authors</option>
+            <div class="panel-sub-header">
+                <div class="panel-filters">
+                    <select id="userFilter" class="user-filter">
+                        <option value="all">All Authors</option>
+                    </select>
+                    <div class="compare">
+                        <span class="compare-icon" title="Compare against">🔄</span>
+                        <select id="commitsCompareFilter" class="compare-select">
+                            <option value="none">Show all commits</option>
+                            <option value="" disabled style="font-style: italic; color: #666;">Select branch to compare</option>
                         </select>
-                        <div class="commits-compare">
-                            <span class="compare-icon">🔄</span>
-                            <select id="commitsCompareFilter" class="compare-select">
-                                <option value="none">Show all commits</option>
-                                <option value="" disabled style="font-style: italic; color: #666;">Select branch to compare</option>
-                            </select>
-                        </div>
                     </div>
                 </div>
-                <div class="commits-content">
-                    <div id="commitsContent">
-                        <div class="loading">Loading commits...</div>
-                    </div>
+            </div>
+            <div class="panel-content">
+                <div id="commitsContent">
+                    <div class="loading">Loading commits...</div>
                 </div>
             </div>
             <div id="resizeCommits" class="resize-handle" data-panel="commits"></div>
@@ -68,24 +66,25 @@
                     <button class="clear-search" onclick="clearFilesSearch()" title="Clear search">×</button>
                 </div>
             </div>
+            <div class="panel-sub-header">
+                <div class="panel-filters">
+                    <div class="compare">
+                        <span class="compare-icon"  title="Compare against">🔄</span>
+                        <select id="filesCompareFilter" class="compare-select">
+                            <option value="working">Current Working Directory</option>
+                            <option value="previous">Previous Commit</option>
+                            <option value="" disabled style="font-style: italic; color: #666;">Select Branch to Compare</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
             <div class="panel-content">
-                <div class="files-header">
-                    <div class="files-filters">
-                        <div class="files-compare">
-                            <span class="compare-icon">🔄</span>
-                            <select id="filesCompareFilter" class="compare-select">
-                                <option value="previous">Previous Commit</option>
-                                <option value="working">Current Working Directory</option>
-                                <option value="" disabled style="font-style: italic; color: #666;">Select Branch to Compare</option>
-                            </select>
-                        </div>
-                    </div>
+                <div id="filesContent">
+                    <div class="empty-state"><h3>Select a commit to view changes</h3></div>
                 </div>
-                <div class="files-content">
-                    <div id="filesContent">
-                        <div class="empty-state"><h3>Select a commit to view changes</h3></div>
-                    </div>
-                </div>
+            </div>
+            <div class="panel-footer" id="filesFooter">
+                <!-- Commit details will be populated here -->
             </div>
             <div id="resizeFiles" class="resize-handle" data-panel="files"></div>
         </div>

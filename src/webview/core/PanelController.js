@@ -4,6 +4,7 @@ class PanelController {
         this.vscode = window.acquireVsCodeApi();
         this.currentBranch = null;
         this.selectedCommits = new Set();
+        this.lastClickedCommit = null;
         this.commits = [];
         this.branches = [];
         this.searchTerm = '';
@@ -17,7 +18,8 @@ class PanelController {
         this.panelSizes = savedSizes ? JSON.parse(savedSizes) : { branches: 280, commits: 400, files: 300 };
         this.searchTimeout = null;
         this.commitsSearchTimeout = null;
-        this.compareAgainst = localStorage.getItem('gitstorm-compare-against') || 'previous';
+        this.compareAgainst = localStorage.getItem('gitstorm-compare-against') || 'working';
+        console.log('Initialized compareAgainst:', this.compareAgainst, 'from localStorage:', localStorage.getItem('gitstorm-compare-against'));
         this.selectedCompareBranch = localStorage.getItem('gitstorm-compare-branch') || null;
         this.fileCompareData = {};
         this.selectedFileId = null;
@@ -204,6 +206,7 @@ class PanelController {
         console.log('selectBranch called with:', branchName);
         this.currentBranch = branchName;
         this.selectedCommits.clear();
+        this.lastClickedCommit = null;
         
         // Reset file changes panel when branch changes
         const filesContent = document.getElementById('filesContent');
@@ -243,10 +246,13 @@ class PanelController {
         this.restoreCompareDropdownState();
     }
 
-    selectCommit(commitHash, isMultiSelect = false) {
-        console.log('selectCommit called with:', commitHash, 'multiSelect:', isMultiSelect);
+    selectCommit(commitHash, isMultiSelect = false, isRangeSelect = false) {
+        console.log('selectCommit called with:', commitHash, 'multiSelect:', isMultiSelect, 'rangeSelect:', isRangeSelect);
         
-        if (isMultiSelect) {
+        if (isRangeSelect && this.lastClickedCommit) {
+            // Range select mode (Shift+click)
+            this.selectCommitRange(this.lastClickedCommit, commitHash);
+        } else if (isMultiSelect) {
             // Multi-select mode (Ctrl+click)
             if (this.selectedCommits.has(commitHash)) {
                 this.selectedCommits.delete(commitHash);
@@ -258,6 +264,9 @@ class PanelController {
             this.selectedCommits.clear();
             this.selectedCommits.add(commitHash);
         }
+        
+        // Update last clicked commit for range selection
+        this.lastClickedCommit = commitHash;
         
         this.updateCommitSelection();
         
@@ -278,6 +287,30 @@ class PanelController {
             console.log('No commits selected, clearing file changes panel');
             this.clearFileChangesPanel();
         }
+    }
+
+    selectCommitRange(startCommitHash, endCommitHash) {
+        console.log('selectCommitRange called with:', startCommitHash, 'to', endCommitHash);
+        
+        // Find the indices of the start and end commits in the current commits array
+        const startIndex = this.commits.findIndex(commit => commit.hash === startCommitHash);
+        const endIndex = this.commits.findIndex(commit => commit.hash === endCommitHash);
+        
+        if (startIndex === -1 || endIndex === -1) {
+            console.warn('Could not find commit indices for range selection');
+            return;
+        }
+        
+        // Determine the range (from smaller index to larger index)
+        const minIndex = Math.min(startIndex, endIndex);
+        const maxIndex = Math.max(startIndex, endIndex);
+        
+        // Add all commits in the range to selection
+        for (let i = minIndex; i <= maxIndex; i++) {
+            this.selectedCommits.add(this.commits[i].hash);
+        }
+        
+        console.log('Range selection added commits from index', minIndex, 'to', maxIndex);
     }
 
     updateCommitSelection() {
@@ -339,9 +372,15 @@ class PanelController {
     clearFileChangesPanel() {
         const filesContent = document.getElementById('filesContent');
         if (filesContent) {
-            // Use layout method to ensure header and footer are shown even when clearing
+            // Generate the file changes layout
             const layoutHtml = this.uiRenderer.generateFileChangesLayout(null, []);
             filesContent.innerHTML = layoutHtml;
+            
+            // Update the footer separately
+            const filesFooter = document.getElementById('filesFooter');
+            if (filesFooter) {
+                filesFooter.innerHTML = this.uiRenderer.generateCommitDetailsHtml(null);
+            }
         }
         this.selectedFileId = null;
     }

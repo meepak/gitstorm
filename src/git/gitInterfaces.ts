@@ -25,4 +25,5 @@ export interface FileChange {
     deletions: number;
     changes: number;
     status: 'A' | 'D' | 'M' | 'R' | 'C' | 'U' | '?';
+    commitHash?: string; // Optional commit hash for multi-commit scenarios
 }

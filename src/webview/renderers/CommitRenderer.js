@@ -27,11 +27,11 @@ class CommitRenderer {
                     </div>
                     <div class="commit-content">
                         <div>
-                            <span class="commit-hash">📝</span>
-                            <span class="commit-message">Uncommitted Changes</span>
+                            <span class="commit-hash has-tooltip" data-full-hash="Uncommitted Changes" title="Uncommitted Changes">📝</span>
+                            <span class="commit-message has-tooltip" data-full-message="Uncommitted Changes" title="Uncommitted Changes">Uncommitted Changes</span>
                         </div>
                         <div class="commit-meta">
-                            <span class="commit-author">Working Directory</span>
+                            <span class="commit-author has-tooltip" data-full-author="Working Directory" title="Working Directory">Working Directory</span>
                             <span class="commit-date">Now</span>
                         </div>
                     </div>
@@ -83,11 +83,11 @@ class CommitRenderer {
                     </div>
                     <div class="commit-content">
                         <div>
-                            <span class="commit-hash">${commit.shortHash}</span>
-                            <span class="commit-message">${this.escapeHtml(commit.message)}</span>
+                            <span class="commit-hash has-tooltip" data-full-hash="${commit.hash}" title="${commit.hash}">${commit.shortHash}</span>
+                            <span class="commit-message has-tooltip" data-full-message="${this.escapeHtml(commit.message)}" title="${this.escapeHtml(commit.message)}">${this.escapeHtml(commit.message)}</span>
                         </div>
                         <div class="commit-meta">
-                            <span class="commit-author">${this.escapeHtml(commit.author)}</span>
+                            <span class="commit-author has-tooltip" data-full-author="${this.escapeHtml(commit.author)}" title="${this.escapeHtml(commit.author)}">${this.escapeHtml(commit.author)}</span>
                             <span class="commit-date">${this.formatDate(commit.date)}</span>
                         </div>
                     </div>

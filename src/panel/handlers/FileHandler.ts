@@ -111,6 +111,12 @@ export class FileHandler {
         try {
             console.log('🚀🚀🚀 UPDATED FileHandler.handleShowFileDiffWithWorking called for:', filePath, 'commit:', commitHash);
             
+            // Handle uncommitted case - this should not happen with the frontend fix, but adding safety check
+            if (commitHash === 'uncommitted') {
+                console.log('🚀🚀🚀 WARNING: Received uncommitted commit hash, this should not happen with multiple commits. Using HEAD instead.');
+                commitHash = 'HEAD';
+            }
+            
             // Check if file exists in both the commit and the working directory
             const fileExistsInCommit = await this.panel.gitService.fileExistsAtCommit(commitHash, filePath);
             const fileExistsInWorking = await this.panel.gitService.fileExistsAtCommit('HEAD', filePath);
@@ -128,13 +134,19 @@ export class FileHandler {
             }
             
             // Get diff between commit and working directory
+            // We want to show changes in the selected commit compared to working directory
+            // So we use commitHash..HEAD to show changes from commit to working directory
+            // But we need to reverse the diff to show from working directory to commit
             const diff = await this.panel.gitService.getFileDiffRange(`${commitHash}..HEAD`, filePath);
             console.log('Working directory diff result length:', diff ? diff.length : 'null/undefined');
+            
+            // Reverse the diff to show changes from working directory to commit
+            const reversedDiff = this.reverseDiff(diff);
             
             this.panel.panel.webview.postMessage({
                 command: 'updateFileDiff',
                 file: filePath,
-                diff: diff
+                diff: reversedDiff
             });
         } catch (error) {
             console.error('Error showing file diff with working directory:', error);
@@ -143,6 +155,20 @@ export class FileHandler {
                 error: error instanceof Error ? error.message : 'Failed to show file diff with working directory'
             });
         }
+    }
+
+    private reverseDiff(diff: string): string {
+        if (!diff) return diff;
+        
+        // Reverse the diff by swapping + and - lines
+        return diff.split('\n').map(line => {
+            if (line.startsWith('+')) {
+                return line.replace(/^\+/, '-');
+            } else if (line.startsWith('-')) {
+                return line.replace(/^-/, '+');
+            }
+            return line;
+        }).join('\n');
     }
 
     async handleShowFileDiffWithBranch(filePath: string, commitHash: string, compareBranch?: string) {

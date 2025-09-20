@@ -294,7 +294,7 @@ class GitOperations {
     }
 
     // File selection
-    selectFile(fileName, commitHash, compareAgainst = 'previous') {
+    selectFile(fileName, commitHash, compareAgainst = 'working') {
         console.log('🚀🚀🚀 UPDATED selectFile called with:', fileName, 'commit:', commitHash, 'compare against:', compareAgainst);
         this.panel.selectedFileId = fileName;
         

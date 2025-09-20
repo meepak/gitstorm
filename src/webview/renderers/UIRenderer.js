@@ -45,7 +45,7 @@ class UIRenderer {
         if (branches && branches.length > 0) {
             this.panel.branches = branches;
             this.populateCommitsCompareFilter();
-            this.panel.searchManager.populateFilesCompareFilter();
+            this.filterRenderer.populateFilesCompareFilter();
         }
     }
 

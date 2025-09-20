@@ -120,15 +120,24 @@ class SearchManager {
                         <div class="file-changes-tree">
                             <div class="empty-state"><h3>No such file in change list</h3></div>
                         </div>
-                        <div class="commit-details">
-                            ${this.panel.uiRenderer.generateCommitDetailsHtml(this.panel.selectedCommit)}
-                        </div>
                     </div>
                 `;
                 filesContent.innerHTML = searchMessageHtml;
+                
+                // Update the footer separately
+                const filesFooter = document.getElementById('filesFooter');
+                if (filesFooter) {
+                    filesFooter.innerHTML = this.panel.uiRenderer.generateCommitDetailsHtml(this.panel.selectedCommit);
+                }
             } else {
                 const newHtml = this.panel.uiRenderer.generateFileChangesLayout(this.panel.selectedCommit, filteredFiles);
                 filesContent.innerHTML = newHtml;
+                
+                // Update the footer separately
+                const filesFooter = document.getElementById('filesFooter');
+                if (filesFooter) {
+                    filesFooter.innerHTML = this.panel.uiRenderer.generateCommitDetailsHtml(this.panel.selectedCommit);
+                }
             }
             console.log('Updated files content with', filteredFiles.length, 'filtered files');
         } else {
@@ -308,22 +317,6 @@ class SearchManager {
         this.filterFiles();
     }
 
-    populateFilesCompareFilter() {
-        const filesCompareFilter = document.getElementById('filesCompareFilter');
-        if (!filesCompareFilter || !this.panel.branches) return;
-        
-        // Clear existing branch options (keep the first 3 default options)
-        const defaultOptions = filesCompareFilter.querySelectorAll('option:not([value="previous"]):not([value="working"]):not([disabled])');
-        defaultOptions.forEach(option => option.remove());
-        
-        // Add branch options
-        this.panel.branches.forEach(branch => {
-            const option = document.createElement('option');
-            option.value = `branch:${branch.name}`;
-            option.textContent = branch.name;
-            filesCompareFilter.appendChild(option);
-        });
-    }
 
     // Get current search state
     getSearchState() {
