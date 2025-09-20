@@ -10,7 +10,7 @@ class FileChangesRenderer {
             ? this.generateFileTreeHtml(files, commit)
             : '<div class="empty-state"><h3>No selection</h3><p>Select a commit to view file changes, or <a href="#" onclick="showWorkingDirectoryChanges()">view working directory changes</a></p></div>';
         
-        // Generate commit details
+        // Generate commit details - pass commit even if null for multiple commits handling
         const commitDetailsHtml = this.generateCommitDetailsHtml(commit);
 
         // Generate compare against header
@@ -161,40 +161,94 @@ class FileChangesRenderer {
                         ${dropdownOptions}
                     </select>
                 </div>
-                <div class="compare-info">
-                    ${isMultipleCommits ? 'Multiple commits selected' : selectedCommits.length === 1 ? 'Single commit selected' : 'No commits selected'}
-                </div>
             </div>
         `;
     }
 
     generateCommitDetailsHtml(commit) {
-        if (!commit) return '';
+        const selectedCommits = Array.from(this.panel.selectedCommits);
+        const isMultipleCommits = selectedCommits.length > 1;
+        
+        // If no commits selected, return empty
+        if (selectedCommits.length === 0) return '';
+        
+        // If single commit but no commit parameter, return empty
+        if (!isMultipleCommits && !commit) return '';
+        
+        // Generate pagination buttons for multiple commits
+        const paginationButtons = isMultipleCommits ? `
+            <div class="commit-pagination">
+                <span class="commit-page-info">1/${selectedCommits.length}</span>
+                <button class="commit-pagination-btn" onclick="
+                    const carousel = document.querySelector('.commit-carousel');
+                    const currentPage = parseInt(document.querySelector('.commit-page-info').textContent.split('/')[0]);
+                    if (currentPage > 1) {
+                        carousel.style.transform = 'translateX(' + ((currentPage - 2) * -100) + '%)';
+                        document.querySelector('.commit-page-info').textContent = (currentPage - 1) + '/${selectedCommits.length}';
+                    }
+                ">‹</button>
+                <button class="commit-pagination-btn" onclick="
+                    const carousel = document.querySelector('.commit-carousel');
+                    const currentPage = parseInt(document.querySelector('.commit-page-info').textContent.split('/')[0]);
+                    if (currentPage < ${selectedCommits.length}) {
+                        carousel.style.transform = 'translateX(' + (currentPage * -100) + '%)';
+                        document.querySelector('.commit-page-info').textContent = (currentPage + 1) + '/${selectedCommits.length}';
+                    }
+                ">›</button>
+            </div>
+        ` : '';
+        
+        // Generate all commit details for carousel
+        const allCommits = isMultipleCommits ? selectedCommits.map(hash => 
+            this.panel.commits.find(c => c.hash === hash) || { hash }
+        ) : [commit];
+        
+        const commitSlides = allCommits.map(commitData => {
+            const message = commitData.message || '';
+            const hashLength = commitData.hash ? commitData.hash.length : 7;
+            const truncatedMessage = message.length > hashLength ? 
+                this.escapeHtml(message.substring(0, hashLength)) + '...' : 
+                this.escapeHtml(message);
+            const showTooltip = message.length > hashLength;
+            
+            return `
+                <div class="commit-slide">
+                    <div class="commit-detail-item">
+                        <span class="commit-detail-label">Hash:</span>
+                        <span class="commit-detail-value">${commitData.hash}</span>
+                    </div>
+                    <div class="commit-detail-item">
+                        <span class="commit-detail-label">Author:</span>
+                        <span class="commit-detail-value">${this.escapeHtml(commitData.author || '')}</span>
+                    </div>
+                    <div class="commit-detail-item">
+                        <span class="commit-detail-label">Date:</span>
+                        <span class="commit-detail-value">${this.formatDate(commitData.date)}</span>
+                    </div>
+                    <div class="commit-detail-item">
+                        <span class="commit-detail-label">Message:</span>
+                        <span class="commit-detail-value message-value ${showTooltip ? 'has-tooltip' : ''}" ${showTooltip ? `title="${this.escapeHtml(message)}"` : ''}>
+                            ${truncatedMessage}
+                            ${showTooltip ? '<span class="message-icon">💬</span>' : ''}
+                        </span>
+                    </div>
+                </div>
+            `;
+        }).join('');
         
         return `
             <div class="commit-details-header">
                 <h3>Commit Details</h3>
+                ${paginationButtons}
             </div>
             <div class="commit-details-content">
-                <div class="commit-detail-item">
-                    <span class="commit-detail-label">Hash:</span>
-                    <span class="commit-detail-value">${commit.hash}</span>
-                </div>
-                <div class="commit-detail-item">
-                    <span class="commit-detail-label">Author:</span>
-                    <span class="commit-detail-value">${this.escapeHtml(commit.author)}</span>
-                </div>
-                <div class="commit-detail-item">
-                    <span class="commit-detail-label">Date:</span>
-                    <span class="commit-detail-value">${this.formatDate(commit.date)}</span>
-                </div>
-                <div class="commit-detail-item">
-                    <span class="commit-detail-label">Message:</span>
-                    <span class="commit-detail-value">${this.escapeHtml(commit.message)}</span>
+                <div class="commit-carousel">
+                    ${commitSlides}
                 </div>
             </div>
         `;
     }
+
 
     getStatusClass(status) {
         switch (status) {

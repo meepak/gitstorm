@@ -322,6 +322,7 @@ class PanelController {
 
     showMultiCommitFileChanges(hashes) {
         console.log('Showing file changes for multiple commits:', hashes);
+        this.currentCommitIndex = 0; // Reset to first commit
         this.vscode.postMessage({
             command: 'getMultiCommitFiles',
             commitHashes: hashes,
@@ -329,6 +330,7 @@ class PanelController {
             compareBranch: this.selectedCompareBranch
         });
     }
+
 
     clearFileChangesPanel() {
         const filesContent = document.getElementById('filesContent');

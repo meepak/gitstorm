@@ -736,6 +736,73 @@ input[type="text"]:focus {
     font-style: italic;
 }
 
+.commit-pagination {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.commit-page-info {
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    font-weight: 500;
+    margin-right: 4px;
+}
+
+.commit-pagination-btn {
+    padding: 2px 6px;
+    border: 1px solid var(--vscode-button-border);
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border-radius: 2px;
+    cursor: pointer;
+    font-size: 12px;
+    min-width: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.commit-pagination-btn:hover:not(:disabled) {
+    background-color: var(--vscode-button-hoverBackground);
+}
+
+.commit-details-content {
+    overflow: hidden;
+}
+
+.commit-carousel {
+    display: flex;
+    transition: transform 0.3s ease-in-out;
+    width: 200%; /* For 2 commits, adjust based on number of commits */
+}
+
+.commit-slide {
+    min-width: 100%;
+    flex-shrink: 0;
+}
+
+.message-value {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.message-icon {
+    font-size: 10px;
+    opacity: 0.7;
+}
+
+.message-value.has-tooltip {
+    cursor: help;
+    border-bottom: 1px dotted var(--vscode-descriptionForeground);
+}
+
+.message-value.has-tooltip:hover {
+    background-color: var(--vscode-hoverHighlight);
+}
+
 .file-tree-item {
     display: flex;
     align-items: center;
@@ -938,6 +1005,9 @@ input[type="text"]:focus {
     background-color: var(--vscode-panel-background);
     border-bottom: 1px solid var(--vscode-panel-border);
     padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 
 .commit-details-header h3 {
