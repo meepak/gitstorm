@@ -219,7 +219,7 @@ class FileChangesRenderer {
         return `
             <div class="compare-header">
                 <div class="compare-header-content">
-                    <span class="compare-icon"  title="Compare against">🔄</span>
+                    <img class="panel-icon" data-icon="compare" alt="Compare" title="Compare Against"/>
                     <select class="compare-select" onchange="changeCompareOptionSingle(this.value)">
                         ${dropdownOptions}
                     </select>

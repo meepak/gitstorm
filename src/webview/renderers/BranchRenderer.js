@@ -93,7 +93,7 @@ class BranchRenderer {
             const isCurrent = branch.isCurrent;
             const highlightClass = isSelected ? 'selected' : '';
             const currentClass = isCurrent ? 'current' : '';
-            const typeIcon = branch.isRemote ? '🌐' : '🌿';
+            const typeIcon = branch.isRemote ? '🌐' : (isCurrent ? '' : '');
             const refs = branch.ahead || branch.behind ? 
                 `+${branch.ahead || 0} -${branch.behind || 0}` : '';
 
@@ -104,11 +104,17 @@ class BranchRenderer {
                 <div class="branch-item ${highlightClass} ${currentClass}" 
                      onclick="selectBranch('${branch.name}')" 
                      oncontextmenu="event.preventDefault(); showBranchContextMenu(event, '${branch.name}')">
-                    <div class="branch-icon">${typeIcon}</div>
+                    <div class="branch-icon">
+                        ${isCurrent ? 
+                            `<img class="panel-icon" data-icon="git-current-branch" alt="Current Branch" style="width: 16px; height: 16px; margin-right: 0;" />` : 
+                            (branch.isRemote ? typeIcon : `<img class="panel-icon" data-icon="git-local-branch" alt="Local Branch" style="width: 16px; height: 16px; margin-right: 0;" />`)
+                        }
+                    </div>
                     <div class="branch-name">${displayName}</div>
                     <div class="branch-refs">${refs}</div>
                 </div>
             `;
         }).join('');
     }
+
 }

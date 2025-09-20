@@ -14,6 +14,9 @@ export class WebviewRenderer {
         const cssPath = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'out', 'styles', 'panel.css'));
         const cssCacheBuster = `?v=${Date.now()}`;
         
+        // Create base assets URI for SVG files
+        const assetsBaseUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'out', 'assets', 'svg'));
+        
         // Load JS files
         const jsFiles = [
             'managers/CacheManager.js',
@@ -41,6 +44,13 @@ export class WebviewRenderer {
         // Inject CSS and JS paths
         htmlContent = htmlContent.replace('<!-- CSS_PLACEHOLDER -->', `<link href="${cssPath}${cssCacheBuster}" rel="stylesheet">`);
         htmlContent = htmlContent.replace('<!-- Load JavaScript modules in correct order -->', jsScripts);
+        
+        // Inject SVG assets base URI
+        htmlContent = htmlContent.replace('<!-- SVG_ASSETS_PLACEHOLDER -->', 
+            `<script>
+                window.assetsBaseUri = "${assetsBaseUri}";
+            </script>`
+        );
         
         // Inject initial panel sizes
         htmlContent = htmlContent.replace('<!-- INITIAL_PANEL_SIZES_PLACEHOLDER -->', 

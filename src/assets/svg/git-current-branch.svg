@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="800px"
+   height="800px"
+   viewBox="0 0 24 24"
+   version="1.1"
+   id="svg9"
+   sodipodi:docname="git-current-branch.svg"
+   inkscape:version="1.2.2 (b0a8486541, 2022-12-01)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs13" />
+  <sodipodi:namedview
+     id="namedview11"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showgrid="false"
+     inkscape:zoom="0.641875"
+     inkscape:cx="408.17916"
+     inkscape:cy="198.63681"
+     inkscape:window-width="1777"
+     inkscape:window-height="1236"
+     inkscape:window-x="915"
+     inkscape:window-y="119"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="🔍-System-Icons" />
+  <!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
+  <title
+     id="title2">ic_fluent_branch_24_filled</title>
+  <desc
+     id="desc4">Created with Sketch.</desc>
+  <g
+     id="🔍-System-Icons"
+     stroke="none"
+     stroke-width="1"
+     fill="none"
+     fill-rule="evenodd">
+    <g
+       id="ic_fluent_branch_24_filled"
+       fill="#008000"
+       fill-rule="nonzero"
+       transform="matrix(-1,0,0,1,25,0)">
+      <path
+         d="M 4,5.5 C 4,3.567 5.567,2 7.5,2 9.433,2 11,3.567 11,5.5 11,7.08957 9.94034,8.43164 8.48889,8.85835 9.17675,11.1112 11.272,12.75 13.75,12.75 h 0.3305 C 14.4239,11.1774 15.8244,10 17.5,10 c 1.933,0 3.5,1.567 3.5,3.5 0,1.933 -1.567,3.5 -3.5,3.5 -1.6756,0 -3.0761,-1.1774 -3.4195,-2.75 H 13.75 c -2.231,0 -4.21817,-1.0437 -5.5,-2.6694 v 3.4999 C 9.82259,15.4239 11,16.8244 11,18.5 11,20.433 9.433,22 7.5,22 5.567,22 4,20.433 4,18.5 4,16.8244 5.17741,15.4239 6.75,15.0805 V 8.91946 C 5.17741,8.57612 4,7.17556 4,5.5 Z"
+         id="🎨-Color" />
+    </g>
+  </g>
+</svg>

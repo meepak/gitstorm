@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GitStorm Panel</title>
     <!-- CSS_PLACEHOLDER -->
+    <!-- SVG_ASSETS_PLACEHOLDER -->
 </head>
 <body oncontextmenu="return false;">
     <div class="header">
-        <h1>GitStorm</h1>
+        <h1><img class="header-icon" data-icon="gitstorm" alt="GitStorm" />GitStorm</h1>
         <div class="header-toolbar">
             <button id="refreshButton" class="toolbar-button" title="Refresh Data">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -29,9 +30,15 @@
     <div class="main-content">
         <div id="branchesPanel" class="panel branches-panel">
             <div class="panel-header" oncontextmenu="event.preventDefault(); showPanelContextMenu(event, 'branches')">
-                <span>Branches</span>
+                <span class="panel-title"><img class="panel-icon" data-icon="git-branches" alt="Branches" /> BRANCHES</span>
                 <div class="search-container">
-                    <input type="text" id="branchesSearch" placeholder="Search branches..." />
+                    <div class="search-input-wrapper">
+                        <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="m21 21-4.35-4.35"></path>
+                        </svg>
+                        <input type="text" id="branchesSearch" placeholder="Search branches..." />
+                    </div>
                     <button class="clear-search" onclick="clearBranchesSearch()" title="Clear search">×</button>
                 </div>
             </div>
@@ -45,9 +52,15 @@
         
         <div id="commitsPanel" class="panel commits-panel">
             <div class="panel-header" oncontextmenu="event.preventDefault(); showPanelContextMenu(event, 'commits')">
-                <span>Commits</span>
+                <span class="panel-title"><img class="panel-icon" data-icon="git-commit" alt="Commits" /> COMMITS</span>
                 <div class="search-container">
-                    <input type="text" id="commitsSearch" placeholder="Search commits..." />
+                    <div class="search-input-wrapper">
+                        <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="m21 21-4.35-4.35"></path>
+                        </svg>
+                        <input type="text" id="commitsSearch" placeholder="Search commits..." />
+                    </div>
                     <button class="clear-search" onclick="clearCommitsSearch()" title="Clear search">×</button>
                 </div>
             </div>
@@ -57,7 +70,7 @@
                         <option value="all">All Authors</option>
                     </select>
                     <div class="compare">
-                        <span class="compare-icon" title="Compare against">🔄</span>
+                        <img class="panel-icon" data-icon="compare" alt="Compare"  title="Compare Against"/>
                         <select id="commitsCompareFilter" class="compare-select">
                             <option value="none">Show all commits</option>
                             <option value="" disabled style="font-style: italic; color: #666;">Select branch to compare</option>
@@ -75,16 +88,22 @@
         
         <div id="filesPanel" class="panel files-panel">
             <div class="panel-header" oncontextmenu="event.preventDefault(); showPanelContextMenu(event, 'files')">
-                <span>CHANGES</span>
+                <span class="panel-title"><img class="panel-icon" data-icon="git-changes" alt="Changes" /> CHANGES</span>
                 <div class="search-container">
-                    <input type="text" id="filesSearch" placeholder="Search files..." />
+                    <div class="search-input-wrapper">
+                        <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="m21 21-4.35-4.35"></path>
+                        </svg>
+                        <input type="text" id="filesSearch" placeholder="Search files..." />
+                    </div>
                     <button class="clear-search" onclick="clearFilesSearch()" title="Clear search">×</button>
                 </div>
             </div>
             <div class="panel-sub-header">
                 <div class="panel-filters">
                     <div class="compare">
-                        <span class="compare-icon"  title="Compare against">🔄</span>
+                        <img class="panel-icon" data-icon="compare" alt="Compare" title="Compare Against" />
                         <select id="filesCompareFilter" class="compare-select">
                             <option value="working">Current Working Directory</option>
                             <option value="previous">Previous Commit</option>
@@ -105,7 +124,9 @@
         </div>
         
         <div class="panel diff-panel">
-            <div class="panel-header" oncontextmenu="event.preventDefault(); showPanelContextMenu(event, 'diff')">Diff Viewer</div>
+            <div class="panel-header" oncontextmenu="event.preventDefault(); showPanelContextMenu(event, 'diff')">
+                <span class="panel-title"><img class="panel-icon" data-icon="git-diff" alt="Diff" /> DIFF VIEWER</span>
+            </div>
             <div class="panel-content">
                 <div id="diffContent">
                     <div class="empty-state">
@@ -223,5 +244,13 @@
     <script src="globals.js"></script>
     
     <!-- INITIAL_PANEL_SIZES_PLACEHOLDER -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Load SVG icons for static content
+            loadSvgIcons();
+            // Setup automatic SVG icon loading for dynamic content
+            setupSvgIconObserver();
+        });
+    </script>
 </body>
 </html>

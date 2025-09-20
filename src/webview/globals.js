@@ -1,6 +1,59 @@
 // Global Functions - Functions that need to be accessible from HTML onclick handlers
 // These functions delegate to the panel controller and its components
 
+// SVG Icon Loading - Global function to load SVG icons for dynamically generated content
+function loadSvgIcons() {
+    if (window.assetsBaseUri) {
+        const icons = document.querySelectorAll('[class*="-icon"][data-icon]');
+        icons.forEach(icon => {
+            const iconType = icon.getAttribute('data-icon');
+            if (iconType && !icon.src) { // Only load if not already loaded
+                const svgPath = `${window.assetsBaseUri}/${iconType}.svg`;
+                icon.src = svgPath;
+                // Apply consistent styling
+                icon.style.width = '16px';
+                icon.style.height = '16px';
+                icon.style.marginRight = '6px';
+                icon.style.verticalAlign = 'middle';
+            }
+        });
+    }
+}
+
+// Auto-load SVG icons when new elements are added to the DOM
+function setupSvgIconObserver() {
+    if (window.assetsBaseUri) {
+        const observer = new MutationObserver((mutations) => {
+            let shouldLoadIcons = false;
+            
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'childList') {
+                    // Check if any added nodes contain panel icons
+                    mutation.addedNodes.forEach((node) => {
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            if (node.classList && Array.from(node.classList).some(cls => cls.endsWith('-icon')) && node.hasAttribute('data-icon')) {
+                                shouldLoadIcons = true;
+                            } else if (node.querySelector && node.querySelector('[class*="-icon"][data-icon]')) {
+                                shouldLoadIcons = true;
+                            }
+                        }
+                    });
+                }
+            });
+            
+            if (shouldLoadIcons) {
+                loadSvgIcons();
+            }
+        });
+        
+        // Start observing the entire document for changes
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
+}
+
 // Branch operations
 function selectBranch(branchName) {
     panelController.selectBranch(branchName);

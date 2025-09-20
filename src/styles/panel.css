@@ -133,6 +133,19 @@ body {
     margin: 0;
     font-size: 16px;
     font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.header-icon {
+    width: 32px !important;
+    height: 32px !important;
+    vertical-align: middle;
+    filter: brightness(0) saturate(100%) invert(1);
+    opacity: 0.3;
+    margin-right:-4px !important;
+    margin-left:-24px !important;
 }
 
 .header-toolbar {
@@ -306,6 +319,28 @@ input[type="text"]:focus {
 .clear-search:active {
     background-color: var(--list-active);
     color: var(--list-active-fg);
+}
+
+/* Search input wrapper with icon */
+.search-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.search-icon {
+    position: absolute;
+    left: var(--spacing-sm);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--description-fg);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.search-input-wrapper input[type="text"] {
+    padding-left: calc(var(--spacing-sm) + 14px + var(--spacing-xs));
 }
 
 /* ===== DROPDOWNS ===== */
@@ -505,9 +540,8 @@ button:hover {
 }
 
 .branch-item.current .branch-name {
-    font-style: italic;
-    text-decoration: underline;
-    color: var(--text-link);
+    font-weight: bold;
+    color: var(--foreground);
 }
 
 .branch-item.selected .branch-name {
@@ -1214,7 +1248,7 @@ button:hover {
 .hidden { display: none !important; }
 .visible { display: block !important; }
 .selected { background-color: var(--list-active) !important; }
-.current { font-style: italic; text-decoration: underline; }
+.current { font-weight: bold; }
 .modified { color: var(--charts-orange); }
 .added { color: var(--charts-green); }
 .deleted { color: var(--charts-red); }
@@ -1331,4 +1365,18 @@ button:hover {
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* ===== PANEL ICONS ===== */
+.panel-title {
+    display: flex;
+    align-items: center;
+    font-weight: 600;
+}
+
+.panel-icon {
+    width: 16px;
+    height: 16px;
+    vertical-align: middle;
+    flex-shrink: 0;
 }
