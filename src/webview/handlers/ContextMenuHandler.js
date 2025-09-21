@@ -62,6 +62,9 @@ class ContextMenuHandler {
             case 'file':
                 this.showFileContextMenu();
                 break;
+            case 'diff-file':
+                this.showDiffFileContextMenu();
+                break;
             case 'directory':
                 this.showDirectoryContextMenu();
                 break;
@@ -81,8 +84,12 @@ class ContextMenuHandler {
                 this.showDefaultContextMenu();
         }
         
-        // Position the context menu
-        this.contextMenu.style.left = x + 'px';
+        // Position the context menu to the left to avoid being cut off
+        // Calculate menu width (approximate 150px) and position to the left
+        const menuWidth = 150;
+        const adjustedX = Math.max(10, x - menuWidth - 10); // Leave 10px margin from left edge
+        
+        this.contextMenu.style.left = adjustedX + 'px';
         this.contextMenu.style.top = y + 'px';
         this.contextMenu.style.display = 'block';
     }
@@ -129,12 +136,21 @@ class ContextMenuHandler {
     }
 
     showFileContextMenu() {
-        // Show file-specific actions
-        this.contextMenu.querySelector('[data-action="open"]').style.display = 'flex';
-        this.contextMenu.querySelector('[data-action="diff"]').style.display = 'flex';
-        this.contextMenu.querySelector('[data-action="copy-path"]').style.display = 'flex';
+        // Show file-specific actions (matching diff-file menu)
+        this.contextMenu.querySelector('[data-action="open-working"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="open-commit"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="open-diff"]').style.display = 'flex';
         this.contextMenu.querySelector('[data-action="reveal"]').style.display = 'flex';
-        this.contextMenu.querySelector('[data-action="refresh"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="copy-path"]').style.display = 'flex';
+    }
+
+    showDiffFileContextMenu() {
+        // Show diff-file-specific actions
+        this.contextMenu.querySelector('[data-action="open-working"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="open-commit"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="open-diff"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="reveal"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="copy-path"]').style.display = 'flex';
     }
 
     showDirectoryContextMenu() {
@@ -180,23 +196,16 @@ class ContextMenuHandler {
             case 'copy':
                 this.panel.gitOperations.copyToClipboard(data.text);
                 break;
-            case 'open':
-                if (type === 'file') {
-                    this.panel.gitOperations.openFile(data.fileName);
-                }
-                break;
-            case 'diff':
-                if (type === 'file') {
-                    this.panel.gitOperations.showFileDiff(data.fileName, data.commitHash);
-                }
-                break;
             case 'copy-path':
-                if (type === 'file' || type === 'directory') {
-                    this.panel.gitOperations.copyToClipboard(data.fileName);
+                if (type === 'file' || type === 'diff-file' || type === 'directory') {
+                    // Get the absolute path by combining with workspace root
+                    const workspaceRoot = this.panel.workspaceRoot || '';
+                    const absolutePath = workspaceRoot ? `${workspaceRoot}/${data.fileName}` : data.fileName;
+                    this.panel.gitOperations.copyToClipboard(absolutePath);
                 }
                 break;
             case 'reveal':
-                if (type === 'file') {
+                if (type === 'file' || type === 'diff-file') {
                     this.panel.gitOperations.revealFileInExplorer(data.fileName);
                 } else if (type === 'directory') {
                     this.panel.gitOperations.revealDirectoryInExplorer(data.directoryName);
@@ -265,6 +274,21 @@ class ContextMenuHandler {
             case 'push':
                 if (type === 'commit') {
                     this.panel.gitOperations.pushCommit(data.commitHash);
+                }
+                break;
+            case 'open-working':
+                if (type === 'diff-file' || type === 'file') {
+                    this.panel.gitOperations.openFileInVSCode(data.fileName);
+                }
+                break;
+            case 'open-commit':
+                if (type === 'diff-file' || type === 'file') {
+                    this.panel.gitOperations.openFileAtCommit(data.fileName, data.commitHash);
+                }
+                break;
+            case 'open-diff':
+                if (type === 'diff-file' || type === 'file') {
+                    this.panel.gitOperations.openDiffInVSCode(data.fileName, data.commitHash);
                 }
                 break;
             case 'refresh':

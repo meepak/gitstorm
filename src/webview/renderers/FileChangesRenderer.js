@@ -37,13 +37,29 @@ class FileChangesRenderer {
             <div class="working-changes-container">
                 <div class="working-changes-sections-container">
                     <div class="working-changes-section">
+                        <div class="section-header" onclick="toggleSection('uncommittedChangesSection')">
+                            <div class="section-header-left">
+                                <div class="section-toggle" id="toggle-uncommittedChangesSection">▼</div>
+                                <h3>Changes</h3>
+                            </div>
+                            <div class="section-header-actions">
+                                <button class="section-action-btn stage-all-btn" onclick="event.stopPropagation(); stageAllChanges()" title="Stage All Changes">+</button>
+                                <button class="section-action-btn discard-all-btn" onclick="event.stopPropagation(); discardAllChanges()" title="Discard All Changes">↶</button>
+                            </div>
+                        </div>
                         <div class="section-content" id="uncommittedChangesList">
                             <div class="loading">Loading uncommitted changes...</div>
                         </div>
                     </div>
                     <div class="working-changes-section">
-                        <div class="section-header">
-                            <h3>Staged Changes</h3>
+                        <div class="section-header" onclick="toggleSection('stagedChangesSection')">
+                            <div class="section-header-left">
+                                <div class="section-toggle" id="toggle-stagedChangesSection">▼</div>
+                                <h3>Staged Changes</h3>
+                            </div>
+                            <div class="section-header-actions">
+                                <button class="section-action-btn unstage-all-btn" onclick="event.stopPropagation(); unstageAllChanges()" title="Unstage All Changes">-</button>
+                            </div>
                         </div>
                         <div class="section-content" id="stagedChangesList">
                             <div class="empty-state">No staged changes</div>
@@ -154,6 +170,17 @@ class FileChangesRenderer {
                 const isStaged = node.status === 'staged' || node.staged;
                 const isUncommitted = fileCommitHash === 'uncommitted' || fileCommitHash === 'WORKING_DIRECTORY';
                 const isStagedFile = fileCommitHash === 'staged';
+                const isUntracked = node.status === 'U' || node.status === 'untracked' || node.untracked;
+                
+                console.log('File status check:', {
+                    fileName: node.name,
+                    status: node.status,
+                    isUntracked: isUntracked,
+                    fileCommitHash: fileCommitHash
+                });
+                
+                // Add untracked indicator to filename
+                const untrackedIndicator = isUntracked ? '<span class="untracked-indicator">*U</span>' : '';
                 
                 let actionButtons = '';
                 if (isUncommitted) {
@@ -174,13 +201,13 @@ class FileChangesRenderer {
                 }
 
                 html += `
-                    <div class="file-tree-item file ${statusClass}" 
+                    <div class="file-tree-item file ${statusClass} ${isUntracked ? 'untracked' : ''}" 
                          data-file-path="${node.file}"
                          onclick="console.log('🚀🚀🚀 File click handler called for:', '${node.file}', 'commit:', '${fileCommitHash}', 'compare against:', '${this.panel.compareAgainst}'); console.log('🚀🚀🚀 selectFile function exists:', typeof selectFile); selectFile('${node.file}', '${fileCommitHash}', '${this.panel.compareAgainst}')" 
                          oncontextmenu="event.preventDefault(); selectFileOnly('${node.file}'); showFileContextMenu(event, '${node.file}', '${fileCommitHash}')">
                         <div class="file-tree-icon">${fileTypeIcon}</div>
                         <div class="file-tree-name">
-                            ${this.escapeHtml(node.name)}${changesText ? `<span class="file-changes"> ${changesText}</span>` : ''}
+                            ${this.escapeHtml(node.name)}${untrackedIndicator}${changesText ? `<span class="file-changes"> ${changesText}</span>` : ''}
                         </div>
                         ${actionButtons}
                     </div>
@@ -306,7 +333,7 @@ class FileChangesRenderer {
         
         return `
             <div class="panel-footer-header">
-                <h3>Commit Details</h3>
+                <h3><img class="panel-icon" data-icon="info" /> Commit Details</h3>
                 ${paginationButtons}
             </div>
             <div class="panel-footer-content">
@@ -324,6 +351,8 @@ class FileChangesRenderer {
             case 'D': return 'deleted';
             case 'M': return 'modified';
             case 'R': return 'renamed';
+            case 'U': return 'untracked';
+            case 'untracked': return 'untracked';
             default: return 'modified';
         }
     }

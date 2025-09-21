@@ -375,4 +375,210 @@ ${fileContent.split('\n').map((line: string) => '+' + line).join('\n')}`;
         const document = await vscode.workspace.openTextDocument(fileUri);
         await vscode.window.showTextDocument(document);
     }
+
+    async handleOpenFileInVSCode(fileName: string): Promise<void> {
+        try {
+            const fileUri = vscode.Uri.file(fileName);
+            const document = await vscode.workspace.openTextDocument(fileUri);
+            await vscode.window.showTextDocument(document);
+        } catch (error) {
+            console.error('Error opening file in VSCode:', error);
+            
+            // Check if the error is due to file not existing
+            if (error instanceof Error && error.message.includes('Unable to resolve nonexistent file')) {
+                // File doesn't exist in working directory, show a helpful message
+                const fileExists = await this.checkFileExists(fileName);
+                if (!fileExists) {
+                    vscode.window.showWarningMessage(
+                        `File '${fileName}' does not exist in the working directory. This might be a file that was deleted or moved.`,
+                        'OK'
+                    );
+                    return;
+                }
+            }
+            
+            // For other errors, show the error message
+            vscode.window.showErrorMessage(
+                `Failed to open file '${fileName}': ${error instanceof Error ? error.message : 'Unknown error'}`
+            );
+        }
+    }
+
+    async handleOpenDiffInVSCode(fileName: string, commitHash: string): Promise<void> {
+        try {
+            console.log('Opening diff in VSCode for file:', fileName, 'commit:', commitHash);
+            
+            const fileUri = vscode.Uri.file(fileName);
+            
+            // Use VSCode's built-in git diff functionality (opens in read-only mode for committed changes)
+            if (commitHash === 'uncommitted' || commitHash === 'WORKING_DIRECTORY') {
+                // For uncommitted changes, use git.openChange
+                try {
+                    await vscode.commands.executeCommand('git.openChange', fileUri);
+                } catch (gitError) {
+                    console.log('git.openChange failed, trying alternative approach');
+                    // Alternative: use git.showChanges
+                    await vscode.commands.executeCommand('git.showChanges', fileUri);
+                }
+            } else {
+                // For committed changes, use git.showChanges (opens in read-only mode)
+                try {
+                    // First try to open the diff using git.showChanges
+                    await vscode.commands.executeCommand('git.showChanges', fileUri);
+                } catch (gitError) {
+                    console.log('git.showChanges failed, trying git.openChange');
+                    // Fallback to git.openChange
+                    await vscode.commands.executeCommand('git.openChange', fileUri);
+                }
+                
+                // Ensure read-only mode for committed changes
+                setTimeout(async () => {
+                    try {
+                        const editor = vscode.window.activeTextEditor;
+                        if (editor && editor.document.uri.scheme === 'file') {
+                            await vscode.commands.executeCommand('workbench.action.files.setActiveEditorReadonly');
+                        }
+                    } catch (readonlyError) {
+                        console.log('Could not set editor to read-only mode:', readonlyError);
+                    }
+                }, 100); // Small delay to ensure the diff is fully loaded
+            }
+        } catch (error) {
+            console.error('Error opening diff in VSCode:', error);
+            // Show error message to user
+            vscode.window.showErrorMessage(`Failed to open diff for ${fileName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    async handleOpenFileAtCommit(fileName: string, commitHash: string): Promise<void> {
+        try {
+            console.log('Opening file at commit:', fileName, 'commit:', commitHash);
+            
+            // For uncommitted changes, open the working directory file
+            if (commitHash === 'uncommitted' || commitHash === 'WORKING_DIRECTORY') {
+                const fileUri = vscode.Uri.file(fileName);
+                const document = await vscode.workspace.openTextDocument(fileUri);
+                await vscode.window.showTextDocument(document);
+                return;
+            }
+            
+            // For committed changes, show the file content at that commit in a read-only document
+            try {
+                // Convert absolute path to relative path from repository root
+                const repoRoot = this.panel.gitService.getRepoRoot();
+                let relativePath = fileName;
+                
+                if (fileName.startsWith(repoRoot)) {
+                    relativePath = fileName.substring(repoRoot.length + 1); // +1 to remove the leading slash
+                }
+                
+                console.log('Getting file content at commit:', commitHash, 'for relative path:', relativePath);
+                
+                // Get file content at the specific commit
+                const fileContent = await this.panel.gitService.getFileContentAtCommit(commitHash, relativePath);
+                
+                if (!fileContent) {
+                    throw new Error(`File content not found at commit ${commitHash} for path: ${relativePath}`);
+                }
+                
+                // Create a text document with the file content
+                const document = await vscode.workspace.openTextDocument({
+                    content: fileContent,
+                    language: this.getLanguageFromFileName(fileName)
+                });
+                
+                // Show the document in read-only mode
+                await vscode.window.showTextDocument(document, { preview: false, preserveFocus: true });
+                
+                // Ensure read-only mode is applied
+                await this.ensureReadOnlyMode();
+                
+            } catch (gitError) {
+                console.error('Error getting file content at commit:', gitError);
+                // Show error message instead of falling back to working directory file
+                vscode.window.showErrorMessage(`Failed to open file at commit ${commitHash}: ${gitError instanceof Error ? gitError.message : 'Unknown error'}`);
+            }
+        } catch (error) {
+            console.error('Error opening file at commit:', error);
+            vscode.window.showErrorMessage(`Failed to open file at commit: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    private async checkFileExists(fileName: string): Promise<boolean> {
+        try {
+            await vscode.workspace.fs.stat(vscode.Uri.file(fileName));
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    private async ensureReadOnlyMode(): Promise<void> {
+        try {
+            // Wait a bit for the editor to be fully loaded
+            await new Promise(resolve => setTimeout(resolve, 200));
+            
+            const editor = vscode.window.activeTextEditor;
+            if (editor) {
+                // Try multiple approaches to ensure read-only mode
+                try {
+                    await vscode.commands.executeCommand('workbench.action.files.setActiveEditorReadonly');
+                } catch (readonlyError) {
+                    console.log('Primary read-only command failed, trying alternative:', readonlyError);
+                    
+                    // Alternative approach: use the editor's read-only property
+                    if (editor.document) {
+                        // Note: This is a more direct approach but might not be available in all VSCode versions
+                        try {
+                            await vscode.commands.executeCommand('editor.action.readonly');
+                        } catch (altError) {
+                            console.log('Alternative read-only command also failed:', altError);
+                        }
+                    }
+                }
+                
+                // Verify read-only mode is applied
+                setTimeout(() => {
+                    // Check if the editor is in read-only mode
+                    if (editor && editor.document) {
+                        console.log('Read-only mode command executed for document:', editor.document.fileName);
+                    }
+                }, 100);
+            }
+        } catch (error) {
+            console.error('Error ensuring read-only mode:', error);
+        }
+    }
+
+    private getLanguageFromFileName(fileName: string): string {
+        const extension = fileName.split('.').pop()?.toLowerCase();
+        const languageMap: { [key: string]: string } = {
+            'js': 'javascript',
+            'ts': 'typescript',
+            'jsx': 'javascriptreact',
+            'tsx': 'typescriptreact',
+            'py': 'python',
+            'java': 'java',
+            'cpp': 'cpp',
+            'c': 'c',
+            'cs': 'csharp',
+            'php': 'php',
+            'rb': 'ruby',
+            'go': 'go',
+            'rs': 'rust',
+            'html': 'html',
+            'css': 'css',
+            'scss': 'scss',
+            'json': 'json',
+            'xml': 'xml',
+            'yaml': 'yaml',
+            'yml': 'yaml',
+            'md': 'markdown',
+            'sql': 'sql',
+            'sh': 'shellscript',
+            'bat': 'batch',
+            'ps1': 'powershell'
+        };
+        return languageMap[extension || ''] || 'plaintext';
+    }
 }

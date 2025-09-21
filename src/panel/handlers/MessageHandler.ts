@@ -147,6 +147,10 @@ export class MessageHandler {
                     await this._workingDirectoryHandler.handleGetStagedChanges();
                     break;
 
+                case 'getWorkingChanges':
+                    await this._workingDirectoryHandler.handleGetWorkingChanges();
+                    break;
+
                 case 'stageAllChanges':
                     await this._workingDirectoryHandler.handleStageAllChanges();
                     break;
@@ -181,6 +185,22 @@ export class MessageHandler {
 
                 case 'pushCommit':
                     await this._workingDirectoryHandler.handlePushCommit(message.commitHash);
+                    break;
+
+                case 'discardAllChanges':
+                    await this._workingDirectoryHandler.handleDiscardAllChanges();
+                    break;
+
+                case 'openFileInVSCode':
+                    await this._fileHandler.handleOpenFileInVSCode(message.fileName);
+                    break;
+
+                case 'openDiffInVSCode':
+                    await this._fileHandler.handleOpenDiffInVSCode(message.fileName, message.commitHash);
+                    break;
+
+                case 'openFileAtCommit':
+                    await this._fileHandler.handleOpenFileAtCommit(message.fileName, message.commitHash);
                     break;
 
                 default:

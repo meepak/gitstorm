@@ -7,6 +7,7 @@ export class GitService {
     private git: SimpleGit;
     private operations: GitOperations;
     private disposables: vscode.Disposable[] = [];
+    private repoRoot: string;
 
     constructor() {
         const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -15,10 +16,12 @@ export class GitService {
         
         if (workspaceRoot) {
             this.git = simpleGit(workspaceRoot);
+            this.repoRoot = workspaceRoot;
             console.log('🚀🚀🚀 GitService: Initialized with workspace root:', workspaceRoot);
         } else {
             // Initialize with current directory as fallback
             this.git = simpleGit();
+            this.repoRoot = process.cwd();
             console.log('🚀🚀🚀 GitService: Initialized with current directory fallback');
         }
         
@@ -194,7 +197,15 @@ export class GitService {
     }
 
     getRepoRoot(): string {
-        return this.operations.getRepoRoot();
+        return this.repoRoot;
+    }
+
+    async discardAllChanges(): Promise<boolean> {
+        return await this.operations.discardAllChanges();
+    }
+
+    async getWorkingChanges(): Promise<{ uncommitted: FileChange[], staged: FileChange[] }> {
+        return await this.operations.getWorkingChanges();
     }
 
     dispose(): void {

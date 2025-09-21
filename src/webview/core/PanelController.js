@@ -24,6 +24,7 @@ class PanelController {
         this.commitsCompareAgainst = 'none';
         this.hasUncommittedChanges = false;
         this.hasStagedChanges = false;
+        this.workspaceRoot = null;
         
         // Initialize cache manager
         console.log('PanelController: About to create CacheManager...', typeof CacheManager);

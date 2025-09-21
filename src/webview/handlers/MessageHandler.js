@@ -81,6 +81,8 @@ class MessageHandler {
                     console.error('Frontend: Received error message:', message.error);
                     // Stop refresh animation on error
                     this.panel.stopRefreshAnimation();
+                    // Reset all loading states on error
+                    this.resetAllLoadingStates();
                     this.handleError(message.error);
                     break;
 
@@ -90,6 +92,10 @@ class MessageHandler {
 
                 case 'updateStagedChanges':
                     this.updateStagedChangesSection(message.files);
+                    break;
+
+                case 'success':
+                    this.handleSuccess(message.message);
                     break;
                     
                 default:
@@ -109,6 +115,11 @@ class MessageHandler {
         this.panel.currentFiles = files || [];
         this.panel.selectedCommit = commit;
         
+        // Only restore normal layout for regular commits, not for uncommitted changes
+        if (this.panel.gitOperations && commit && commit.hash !== 'uncommitted' && commit.hash !== 'WORKING_DIRECTORY') {
+            this.panel.gitOperations.restoreNormalLayout();
+        }
+        
         const filesContent = document.getElementById('filesContent');
         console.log('filesContent element found:', !!filesContent);
         
@@ -117,10 +128,17 @@ class MessageHandler {
             const layoutHtml = this.panel.uiRenderer.generateFileChangesLayout(commit, files);
             filesContent.innerHTML = layoutHtml;
             
-            // Update the footer separately
+            // Handle footer based on commit type
             const filesFooter = document.getElementById('filesFooter');
             if (filesFooter) {
-                filesFooter.innerHTML = this.panel.uiRenderer.generateCommitDetailsHtml(commit);
+                if (commit && commit.hash !== 'uncommitted' && commit.hash !== 'WORKING_DIRECTORY') {
+                    // Show commit details footer for regular commits
+                    filesFooter.innerHTML = this.panel.uiRenderer.generateCommitDetailsHtml(commit);
+                    filesFooter.style.display = 'block';
+                } else {
+                    // Hide commit details footer for uncommitted changes
+                    filesFooter.style.display = 'none';
+                }
             }
             console.log('Files content updated successfully');
         } else {
@@ -132,6 +150,10 @@ class MessageHandler {
         const diffContent = document.getElementById('diffContent');
         if (diffContent) {
             if (diff) {
+                // Store current diff file information for context menu
+                this.panel.currentDiffFile = file;
+                this.panel.currentDiffCommitHash = this.panel.selectedCommit || 'uncommitted';
+                
                 const formattedDiff = this.formatDiff(diff, file);
                 diffContent.innerHTML = formattedDiff;
             } else {
@@ -142,7 +164,20 @@ class MessageHandler {
 
     formatDiff(diff, fileName) {
         const lines = diff.split('\n');
-        let formattedHtml = `<div class="diff-header">📄 ${this.escapeHtml(fileName)}</div>`;
+        const commitHash = this.panel.currentDiffCommitHash || 'uncommitted';
+        
+        let formattedHtml = `
+            <div class="diff-header">
+                <div class="diff-header-content">
+                    <span class="diff-file-name">📄 ${this.escapeHtml(fileName)}</span>
+                    <div class="diff-header-actions"></div>
+                        <button class="diff-menu-btn" onclick="showDiffFileContextMenu(event, '${this.escapeHtml(fileName)}', '${commitHash}')" title="File Actions">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" viewBox="0 0 57.6 40.659"><path fill-rule="evenodd" d="M57.6 33.882v6.777H0v-6.777zm0-16.94v6.776H0V16.94ZM57.6 0v6.776H0V0Z" stroke-width="0.03" fill="currentColor"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
         
         lines.forEach(line => {
             // Git diff headers (these should not be colored as additions/deletions)
@@ -167,6 +202,11 @@ class MessageHandler {
 
     handleBranchComparison(comparison) {
         if (comparison && comparison.files) {
+            // Restore normal layout for branch comparison (show commit details footer, enable scrolling)
+            if (this.panel.gitOperations) {
+                this.panel.gitOperations.restoreNormalLayout();
+            }
+            
             const filesContent = document.getElementById('filesContent');
             if (filesContent) {
                 // Generate the file changes layout
@@ -186,6 +226,11 @@ class MessageHandler {
         // Store current files for search functionality
         this.panel.currentFiles = files || [];
         this.panel.selectedCommit = null; // Multiple commits selected
+        
+        // Restore normal layout for multi-commit files (show commit details footer, enable scrolling)
+        if (this.panel.gitOperations) {
+            this.panel.gitOperations.restoreNormalLayout();
+        }
         
         const filesContent = document.getElementById('filesContent');
         if (filesContent && files) {
@@ -284,18 +329,39 @@ class MessageHandler {
     }
 
     updateUncommittedChangesSection(files) {
+        console.log('updateUncommittedChangesSection called with files:', files);
+        console.log('Uncommitted files count:', files ? files.length : 0);
+        if (files && files.length > 0) {
+            console.log('Uncommitted file names:', files.map(f => f.file));
+        }
+        
+        // Reset all loading states when files are updated
+        this.resetAllLoadingStates();
+        
         const uncommittedList = document.getElementById('uncommittedChangesList');
         if (uncommittedList) {
             if (files && files.length > 0) {
+                console.log('Rendering uncommitted files:', files.length);
                 const fileTreeHtml = this.panel.uiRenderer.fileChangesRenderer.generateFileTreeHtml(files, { hash: 'uncommitted' });
                 uncommittedList.innerHTML = fileTreeHtml;
             } else {
                 uncommittedList.innerHTML = '<div class="empty-state">No uncommitted changes</div>';
             }
+        } else {
+            console.log('uncommittedChangesList element not found, layout may not be ready yet');
         }
     }
 
     updateStagedChangesSection(files) {
+        console.log('updateStagedChangesSection called with files:', files);
+        console.log('Staged files count:', files ? files.length : 0);
+        if (files && files.length > 0) {
+            console.log('Staged file names:', files.map(f => f.file));
+        }
+        
+        // Reset all loading states when files are updated
+        this.resetAllLoadingStates();
+        
         const stagedList = document.getElementById('stagedChangesList');
         const commitFooter = document.getElementById('workingChangesFooter');
         
@@ -307,6 +373,7 @@ class MessageHandler {
                 // Show commit button when there are staged changes
                 if (commitFooter) {
                     commitFooter.style.display = 'block';
+                    commitFooter.style.visibility = 'visible';
                 }
             } else {
                 stagedList.innerHTML = '<div class="empty-state">No staged changes</div>';
@@ -314,9 +381,34 @@ class MessageHandler {
                 // Hide commit button when no staged changes
                 if (commitFooter) {
                     commitFooter.style.display = 'none';
+                    commitFooter.style.visibility = 'hidden';
                 }
             }
+        } else {
+            console.log('stagedChangesList element not found, layout may not be ready yet');
         }
+    }
+
+    handleSuccess(message) {
+        console.log('Success message received:', message);
+        // Reset all loading states on success
+        this.resetAllLoadingStates();
+    }
+
+    resetAllLoadingStates() {
+        // Reset all section action buttons
+        const sectionButtons = document.querySelectorAll('.section-action-btn');
+        sectionButtons.forEach(button => {
+            button.classList.remove('loading');
+            button.disabled = false;
+        });
+        
+        // Reset all file action buttons
+        const fileButtons = document.querySelectorAll('.file-action-btn');
+        fileButtons.forEach(button => {
+            button.classList.remove('loading');
+            button.disabled = false;
+        });
     }
 
     // Method to send messages to extension

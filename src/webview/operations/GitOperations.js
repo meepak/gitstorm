@@ -5,12 +5,25 @@ class GitOperations {
     constructor(panelController) {
         this.panel = panelController;
         this.confirmationDialog = null; // Initialize lazily
+        
+        // Debug: Check if ConfirmationDialog is available at construction time
+        console.log('GitOperations constructor: ConfirmationDialog available:', typeof ConfirmationDialog !== 'undefined');
+        console.log('GitOperations constructor: Document ready state:', document.readyState);
+        console.log('GitOperations constructor: All scripts loaded:', document.scripts.length);
     }
 
     // Lazy initialization of confirmation dialog
     getConfirmationDialog() {
-        if (!this.confirmationDialog && typeof ConfirmationDialog !== 'undefined') {
-            this.confirmationDialog = new ConfirmationDialog();
+        if (!this.confirmationDialog) {
+            // Check if ConfirmationDialog is available
+            if (typeof ConfirmationDialog !== 'undefined') {
+                this.confirmationDialog = new ConfirmationDialog();
+            } else {
+                console.error('ConfirmationDialog class not available');
+                console.log('Available window objects:', Object.keys(window).filter(key => key.includes('Dialog') || key.includes('Confirmation')));
+                console.log('Script loading status:', document.readyState);
+                return null;
+            }
         }
         return this.confirmationDialog;
     }
@@ -35,7 +48,10 @@ class GitOperations {
     }
 
     openFile(fileName) {
-        this.panel.messageHandler.sendMessage('openFile', { fileName });
+        // Get the absolute path by combining with workspace root
+        const workspaceRoot = this.panel.workspaceRoot || '';
+        const absolutePath = workspaceRoot ? `${workspaceRoot}/${fileName}` : fileName;
+        this.panel.messageHandler.sendMessage('openFile', { fileName: absolutePath });
     }
 
     showFileDiff(fileName, commitHash) {
@@ -141,11 +157,41 @@ class GitOperations {
     }
 
     revealFileInExplorer(fileName) {
-        this.panel.messageHandler.sendMessage('revealFileInExplorer', { filePath: fileName });
+        // Get the absolute path by combining with workspace root
+        const workspaceRoot = this.panel.workspaceRoot || '';
+        const absolutePath = workspaceRoot ? `${workspaceRoot}/${fileName}` : fileName;
+        this.panel.messageHandler.sendMessage('revealFileInExplorer', { filePath: absolutePath });
     }
 
     revealDirectoryInExplorer(directoryName) {
         this.panel.messageHandler.sendMessage('revealDirectoryInExplorer', { directoryName });
+    }
+
+    openFileInVSCode(fileName) {
+        // Get the absolute path by combining with workspace root
+        const workspaceRoot = this.panel.workspaceRoot || '';
+        const absolutePath = workspaceRoot ? `${workspaceRoot}/${fileName}` : fileName;
+        this.panel.messageHandler.sendMessage('openFileInVSCode', { fileName: absolutePath });
+    }
+
+    openDiffInVSCode(fileName, commitHash) {
+        // Get the absolute path by combining with workspace root
+        const workspaceRoot = this.panel.workspaceRoot || '';
+        const absolutePath = workspaceRoot ? `${workspaceRoot}/${fileName}` : fileName;
+        this.panel.messageHandler.sendMessage('openDiffInVSCode', { 
+            fileName: absolutePath, 
+            commitHash: commitHash 
+        });
+    }
+
+    openFileAtCommit(fileName, commitHash) {
+        // Get the absolute path by combining with workspace root
+        const workspaceRoot = this.panel.workspaceRoot || '';
+        const absolutePath = workspaceRoot ? `${workspaceRoot}/${fileName}` : fileName;
+        this.panel.messageHandler.sendMessage('openFileAtCommit', { 
+            fileName: absolutePath, 
+            commitHash: commitHash 
+        });
     }
 
     // Branch operations
@@ -185,7 +231,29 @@ class GitOperations {
                 }
             );
         } else {
-            console.error('ConfirmationDialog not available');
+            // Retry after a short delay if ConfirmationDialog is not ready
+            console.log('ConfirmationDialog not ready, retrying in 200ms...');
+            setTimeout(() => {
+                const retryDialog = this.getConfirmationDialog();
+                if (retryDialog) {
+                    retryDialog.show(
+                        `Are you sure you want to delete branch "${branchName}"?`,
+                        'Delete Branch',
+                        {
+                            confirmText: 'Delete',
+                            confirmButtonClass: 'danger-btn'
+                        },
+                        (confirmed) => {
+                            if (confirmed) {
+                                this.panel.messageHandler.sendMessage('deleteBranch', { branchName });
+                            }
+                        }
+                    );
+                } else {
+                    console.error('ConfirmationDialog still not available, proceeding without confirmation');
+                    this.panel.messageHandler.sendMessage('deleteBranch', { branchName });
+                }
+            }, 200);
         }
     }
 
@@ -224,7 +292,29 @@ class GitOperations {
                 }
             );
         } else {
-            console.error('ConfirmationDialog not available');
+            // Retry after a short delay if ConfirmationDialog is not ready
+            console.log('ConfirmationDialog not ready, retrying in 200ms...');
+            setTimeout(() => {
+                const retryDialog = this.getConfirmationDialog();
+                if (retryDialog) {
+                    retryDialog.show(
+                        'Are you sure you want to revert this commit?',
+                        'Revert Commit',
+                        {
+                            confirmText: 'Revert',
+                            confirmButtonClass: 'danger-btn'
+                        },
+                        (confirmed) => {
+                            if (confirmed) {
+                                this.panel.messageHandler.sendMessage('revertCommit', { commitHash });
+                            }
+                        }
+                    );
+                } else {
+                    console.error('ConfirmationDialog still not available, proceeding without confirmation');
+                    this.panel.messageHandler.sendMessage('revertCommit', { commitHash });
+                }
+            }, 200);
         }
     }
 
@@ -241,15 +331,69 @@ class GitOperations {
         // Clear diff viewer when uncommitted changes are selected
         this.panel.clearDiffViewer();
         
-        // Show uncommitted changes (both uncommitted and staged) in file panel
-        this.loadWorkingChanges();
+        // Show uncommitted changes layout in file panel
+        this.showUncommittedChangesLayout();
+        
+        // Load both uncommitted and staged changes after a short delay to ensure layout is ready
+        setTimeout(() => {
+            this.loadWorkingChanges();
+        }, 100);
+    }
+
+    showUncommittedChangesLayout() {
+        const filesContent = document.getElementById('filesContent');
+        const panelContent = filesContent?.parentElement;
+        
+        if (filesContent) {
+            // Generate the working changes layout
+            const layoutHtml = this.panel.uiRenderer.generateFileChangesLayout({ hash: 'uncommitted' }, []);
+            filesContent.innerHTML = layoutHtml;
+            
+            // Disable panel-content scrolling for working changes mode
+            if (panelContent) {
+                panelContent.classList.add('working-changes-mode');
+            }
+            
+            // Hide the commit details footer for uncommitted changes
+            const filesFooter = document.getElementById('filesFooter');
+            if (filesFooter) {
+                filesFooter.style.display = 'none';
+            }
+            
+            // Hide working changes footer initially, it will be shown when there are staged changes
+            const workingChangesFooter = document.getElementById('workingChangesFooter');
+            if (workingChangesFooter) {
+                workingChangesFooter.style.display = 'none';
+            }
+        }
+    }
+
+    restoreNormalLayout() {
+        const filesContent = document.getElementById('filesContent');
+        const panelContent = filesContent?.parentElement;
+        
+        if (filesContent && panelContent) {
+            // Remove working changes mode to restore normal scrolling
+            panelContent.classList.remove('working-changes-mode');
+            
+            // Show the commit details footer for regular commits
+            const filesFooter = document.getElementById('filesFooter');
+            if (filesFooter) {
+                filesFooter.style.display = 'block';
+            }
+            
+            // Hide working changes footer
+            const workingChangesFooter = document.getElementById('workingChangesFooter');
+            if (workingChangesFooter) {
+                workingChangesFooter.style.display = 'none';
+            }
+        }
     }
 
     async loadWorkingChanges() {
         try {
-            // Load both uncommitted and staged changes
-            this.panel.messageHandler.sendMessage('getUncommittedChanges');
-            this.panel.messageHandler.sendMessage('getStagedChanges');
+            // Load both uncommitted and staged changes in one optimized call
+            this.panel.messageHandler.sendMessage('getWorkingChanges');
         } catch (error) {
             console.error('Error loading uncommitted changes:', error);
         }
@@ -284,7 +428,7 @@ class GitOperations {
     }
 
     unstageAllChanges() {
-        console.log('Unstaging all changes');
+        console.log('Unstaging all changes - GitOperations.unstageAllChanges called');
         this.panel.messageHandler.sendMessage('unstageAllChanges');
     }
 
@@ -301,9 +445,15 @@ class GitOperations {
     }
 
     revertFile(filePath) {
+        console.log('=== FRONTEND REVERT FILE DEBUG ===');
         console.log('Reverting file:', filePath);
+        console.log('ConfirmationDialog available:', typeof ConfirmationDialog !== 'undefined');
+        
         const dialog = this.getConfirmationDialog();
+        console.log('Dialog instance:', !!dialog);
+        
         if (dialog) {
+            console.log('Showing confirmation dialog for file:', filePath);
             dialog.show(
                 `Are you sure you want to revert changes to "${filePath}"?`,
                 'Revert File',
@@ -312,13 +462,171 @@ class GitOperations {
                     confirmButtonClass: 'danger-btn'
                 },
                 (confirmed) => {
+                    console.log('Confirmation result:', confirmed);
                     if (confirmed) {
+                        console.log('Proceeding with revert for file:', filePath);
                         this.panel.messageHandler.sendMessage('revertFile', { filePath });
+                    } else {
+                        console.log('Revert cancelled by user');
                     }
                 }
             );
         } else {
-            console.error('ConfirmationDialog not available');
+            // Try to wait for ConfirmationDialog to be available
+            console.log('ConfirmationDialog not available, waiting for it to load...');
+            this.waitForConfirmationDialog(filePath);
+        }
+        console.log('=== END FRONTEND REVERT FILE DEBUG ===');
+    }
+
+    waitForConfirmationDialog(filePath) {
+        let attempts = 0;
+        const maxAttempts = 10;
+        const checkInterval = 100; // 100ms intervals
+        
+        const checkDialog = () => {
+            attempts++;
+            console.log(`Attempt ${attempts}/${maxAttempts} to load ConfirmationDialog...`);
+            
+            if (typeof ConfirmationDialog !== 'undefined') {
+                console.log('ConfirmationDialog is now available!');
+                this.confirmationDialog = new ConfirmationDialog();
+                this.revertFile(filePath); // Retry the revert
+                return;
+            }
+            
+            if (attempts < maxAttempts) {
+                setTimeout(checkDialog, checkInterval);
+            } else {
+                console.error('ConfirmationDialog still not available after maximum attempts');
+                console.log('Using fallback confirmation dialog...');
+                this.showFallbackConfirmation(filePath);
+            }
+        };
+        
+        checkDialog();
+    }
+
+    showFallbackConfirmation(filePath) {
+        console.log('Creating fallback confirmation dialog for file:', filePath);
+        
+        // Create a simple modal dialog
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        `;
+        
+        const dialog = document.createElement('div');
+        dialog.style.cssText = `
+            background: var(--panel-bg, #1e1e1e);
+            border: 1px solid var(--panel-border, #333);
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 400px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        `;
+        
+        dialog.innerHTML = `
+            <h3 style="margin: 0 0 15px 0; color: var(--text-color, #fff);">Revert File</h3>
+            <p style="margin: 0 0 20px 0; color: var(--text-color, #ccc);">
+                Are you sure you want to revert changes to "${filePath}"?
+            </p>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button id="cancelRevert" style="
+                    background: var(--button-bg, #333);
+                    color: var(--button-fg, #fff);
+                    border: 1px solid var(--button-border, #555);
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                ">Cancel</button>
+                <button id="confirmRevert" style="
+                    background: var(--danger-bg, #d73a49);
+                    color: var(--danger-fg, #fff);
+                    border: 1px solid var(--danger-border, #d73a49);
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                ">Revert</button>
+            </div>
+        `;
+        
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+        
+        // Handle button clicks
+        document.getElementById('cancelRevert').onclick = () => {
+            console.log('Fallback confirmation: User cancelled revert');
+            document.body.removeChild(overlay);
+        };
+        
+        document.getElementById('confirmRevert').onclick = () => {
+            console.log('Fallback confirmation: User confirmed revert for file:', filePath);
+            document.body.removeChild(overlay);
+            this.panel.messageHandler.sendMessage('revertFile', { filePath });
+        };
+        
+        // Handle escape key
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                console.log('Fallback confirmation: User cancelled revert (ESC)');
+                document.body.removeChild(overlay);
+                document.removeEventListener('keydown', handleKeyDown);
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+    }
+
+    discardAllChanges() {
+        console.log('Discarding all changes');
+        const dialog = this.getConfirmationDialog();
+        if (dialog) {
+            dialog.show(
+                'Are you sure you want to discard all uncommitted changes? This action cannot be undone.',
+                'Discard All Changes',
+                {
+                    confirmText: 'Discard All',
+                    confirmButtonClass: 'danger-btn'
+                },
+                (confirmed) => {
+                    if (confirmed) {
+                        this.panel.messageHandler.sendMessage('discardAllChanges');
+                    }
+                }
+            );
+        } else {
+            // Retry after a short delay if ConfirmationDialog is not ready
+            console.log('ConfirmationDialog not ready, retrying in 200ms...');
+            setTimeout(() => {
+                const retryDialog = this.getConfirmationDialog();
+                if (retryDialog) {
+                    retryDialog.show(
+                        'Are you sure you want to discard all uncommitted changes? This action cannot be undone.',
+                        'Discard All Changes',
+                        {
+                            confirmText: 'Discard All',
+                            confirmButtonClass: 'danger-btn'
+                        },
+                        (confirmed) => {
+                            if (confirmed) {
+                                this.panel.messageHandler.sendMessage('discardAllChanges');
+                            }
+                        }
+                    );
+                } else {
+                    console.error('ConfirmationDialog still not available, proceeding without confirmation');
+                    this.panel.messageHandler.sendMessage('discardAllChanges');
+                }
+            }, 200);
         }
     }
 
@@ -607,6 +915,12 @@ window.unstageFile = function(filePath) {
 window.revertFile = function(filePath) {
     if (window.panelController && window.panelController.gitOperations) {
         window.panelController.gitOperations.revertFile(filePath);
+    }
+};
+
+window.discardAllChanges = function() {
+    if (window.panelController && window.panelController.gitOperations) {
+        window.panelController.gitOperations.discardAllChanges();
     }
 };
 

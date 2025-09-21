@@ -30,6 +30,7 @@ export class WebviewRenderer {
             'renderers/IconRenderer.js',
             'renderers/UIRenderer.js',
             'managers/SearchManager.js',
+            'components/ConfirmationDialog.js',
             'operations/GitOperations.js',
             'globals.js'
         ];

@@ -188,3 +188,390 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 - Built with VSCode's powerful WebView API
 - Uses Simple-Git for reliable Git operations
 - Thanks to the VSCode extension community for best practices
+
+
+# TODO
+
+    ## Stash Requirements
+        Placement:
+            Add a “Stashes” section in the Branches panel.
+            List entries as stash@{N}: <message> with originating branch and commit subject.
+
+        Display:
+            Clicking a stash loads its commits/diffs in the Commits panel, same as a branch.
+            Show staged vs unstaged changes (use stash commit’s parents).
+            File changes panel supports same compare options (prev, working dir, other branch).
+            Actions (context menu):
+            Apply → git stash apply stash@{N}
+            Pop → git stash pop stash@{N}
+            Drop → git stash drop stash@{N}
+            Create branch → git stash branch <name> stash@{N}
+
+        Behavior:
+            Treat each stash like a temporary branch ref.
+            Allow viewing diffs without applying.
+            Safe-delete (drop) with confirmation.
+
+
+    ## DAG Indicator Requirements
+        Placement
+            Commits Panel:
+                - Show the DAG indicator (graph lines and nodes) alongside the list of commits.
+                - Each commit row has a small left-margin column for DAG lines.
+                - Branch labels (HEAD, feature names, tags) appear inline with the node.
+
+        Representation
+            Nodes:
+                - Small circles for commits.
+                - Highlight the current commit (selected row) with a filled/colored circle.
+            Edges:
+                - Vertical and diagonal lines connect parent/child commits.
+                - Each branch/merge path has a unique, consistent color.
+            Labels:
+                - Show branch/tag names near their tip commits (similar to git log --decorate --oneline --graph).
+            Uncommitted changes:
+                - Display as a synthetic node (e.g., hollow circle at the top of the DAG when the working tree is dirty).
+            Interaction
+                - Clicking a node = select that commit.
+                - Multi-select continues to work (highlight multiple nodes).
+                - Hover shows quick info: commit hash, author, date.
+                - Right-click menu (same as commit list: revert, cherry-pick, checkout, etc.).
+            Modes
+                - Single branch mode: show commits only from the selected branch, DAG lines limited to that branch.
+                - Compare mode (branch A vs branch B):
+                - Show both DAGs in one view, with diverged commits emphasized.
+                - Commits exclusive to A or B are highlighted.
+                - All commits mode: full DAG across all refs, like git log --all --graph.
+            Performance
+                - Virtualized list rendering (only visible rows draw lines).
+                - Colors reused cyclically when too many branches exist.
+                - Lazy-load more history on scroll.
+
+        
+        DAG   Commit (subject)                          Meta
+        │                                            [develop]
+        ●──┐  7ffc552  bug fixes                      Deepak · Aug 19
+        │  │
+        │  ●  777896e  Event Emitter pycache…         Deepak · Aug 17
+        │  │
+        │  ●  af429d3  EventEmitter class for…        Deepak · Aug 17
+        │  │
+        │  │  ┌──●  8c5d01a  user account level…      Deepak · Aug 17   (side branch)
+        │  └──┘
+        │
+        ●──┬──●  6efd4da  deployment service bug      Deepak · Jul 24   (merge)
+        │  │
+        │  ●  1353e0c  add end point for browse…      Deepak · Jul 24
+        │  │
+        │  ●  f190bf1  sts service used in s3…        Deepak · Jul 21
+        │  │
+        └──●  824036e  missing function parameter     Deepak · Jul 14
+
+
+    ## Branches Panel Context Menu
+
+        ### Local branch (not current)
+
+        - **Checkout / Switch to this branch** → `git switch <branch>`
+        - **Compare against…** (set as compare target for Commits/Changes panels)
+        - Local branches list
+        - Remote branches (grouped)
+        - Default quick item: `main` (or repo default)
+        - **Merge into current branch** (fast-forward allowed) → `git merge <branch>`
+        - **Rebase current branch onto this** → `git rebase <branch>`
+        - **Create new branch from here…** → prompt name → `git branch <new> <branch>`
+        - **Rename…** → `git branch -m <old> <new>` (disallow if remote-tracking exists without updating)
+        - **Set upstream…** (track remote) → choose remote ref →  
+        `git branch -u <remote>/<name> <branch>`
+        - **Unset upstream** → `git branch --unset-upstream <branch>`
+        - **Delete**
+        - Safe: `git branch -d <branch>` (refuse if unmerged)
+        - Force: `git branch -D <branch>` (confirm with warning + show tip SHA)
+        - **Protect / Unprotect** (plugin-level setting) → toggles a “are you sure?” gate on delete/force push for critical branches
+        - **Open file history filtered to this branch** → switch Commits panel scope
+
+        ---
+
+        ### Local branch (current)
+
+        - **Commit template / Amend last commit** → open quick commit actions
+        - **Push / Pull / Fetch (this branch)** → `git push`, `git pull --rebase`, `git fetch`
+        - **Rebase onto…** (pick target) → `git rebase <target>`
+        - **Merge…** (pick source branch into current) → `git merge <source>`
+        - **Create worktree here…** → dir prompt → `git worktree add <path> <branch>`
+        - **Stash changes… (quick)**
+        - Stash (all/keep index/include untracked) → `git stash push [-k|-u] -m "<msg>"`
+        - Stash & Track as todo (plugin note)
+
+        ---
+
+        ### Remote branch (`origin/...`)
+
+        - **Checkout as new local…** →  
+        `git switch -c <new> --track <remote>/<name>`
+        - **Track with existing local…** → pick local →  
+        `git branch -u <remote>/<name> <local>`
+        - **Compare against…** (sets compare target; show “stale data” hint if last fetch too old)
+        - **Fetch only this branch** →  
+        `git fetch origin <name>:refs/remotes/origin/<name>`
+        - **Delete remote branch…** (confirm) →  
+        `git push origin --delete <name>`
+        - **Open on host** (if remote = GitHub/GitLab/Bitbucket and URL known) → open PRs/commits page
+
+        ---
+
+        ### Group headers (sections)
+
+        ### Local (header)
+        - **New branch…** → `git switch -c <name>`
+
+        ### origin (header)
+        - **Fetch/prune** → `git fetch --prune origin`
+        - **Add remote… / Edit remote… / Remove remote**
+
+        ### Stashes (header) *(if you show stashes here)*
+        - **New stash…** (same options as above)
+        - **Apply latest / Pop latest**
+
+        ---
+
+        ### Stash entry (if listed under Branches)
+
+        - **Apply** → `git stash apply stash@{n}`
+        - **Pop** → `git stash pop stash@{n}`
+        - **Drop** → `git stash drop stash@{n}` (confirm)
+        - **Create branch from stash…** →  
+        `git stash branch <name> stash@{n}`
+        - **View diff** → load stash into Commits/Changes panels
+
+        ---
+
+        ### Multi-select actions (Local)
+
+        - **Delete selected**
+        - Safe delete all (show per-branch success/fail)
+        - Force delete (single confirmation listing all)
+        - **Compare A…B** (enabled when exactly two selected) → opens compare mode in Commits panel
+        - **Merge selected into current** (queue merges; stop on conflict)
+
+        ---
+
+        ### Safety & UX rules
+
+        - Disable destructive actions on **current branch** (`delete`, `rename`).
+        - For **protected branches** (e.g., `main`, `release/*`), require extra confirmation; optionally block force delete.
+        - Before remote comparisons, if last fetch > N minutes, show *“Data may be stale”* with **Fetch now** shortcut.
+        - On **force delete unmerged**, display the **tip SHA** with copy button and hint to recover:  
+        `git branch <name> <sha>` or `git reflog`
+        - Show **ahead/behind badge** in the menu header (e.g., `↑2 ↓1 vs origin/main`) and a quick action *“Rebase onto upstream”*.
+        - All long-running ops show progress and expose **Continue/Abort** for rebase/cherry-pick/merge conflict flows.
+
+
+
+
+    ## Lost & Found (Dangling Commits) Section
+
+        ### Placement
+        - **Branches Panel** → bottom section, below **Stashes**.
+        - Collapsed by default.
+        - Header shows **“Lost & Found (Dangling)”** with a commit count badge when entries are detected.
+
+        ---
+
+        ### Discovery
+        - Trigger scan **only when expanded** (avoid perf cost at startup).
+        - Methods:
+        - **Fast scan**:  
+            - `git rev-list --all` → reachable set.  
+            - `git reflog --all --format='%H %gd %gs'` → reflog entries.  
+            - **Dangling = reflog commits not in reachable set**.  
+        - **Deep scan** (optional toggle):  
+            - `git fsck --no-reflogs --unreachable --no-progress --lost-found`  
+            - Parse `dangling commit <sha>` lines.  
+        - Cache results until user performs a fetch/rebase/GC or clicks **Rescan**.
+
+        ---
+
+        ### UI Layout
+
+            Lost & Found (Dangling) ▼ (3)
+            • 7f3a1c2 WIP: refactor deploy Deepak · Aug 17, 2025
+            • 8e9b0a4 Fix migration bug Ashley · Aug 10, 2025
+            • 91ab2c7 Temp logging changes teddinata · Jul 29, 2025
+
+        ### Branches Panel
+
+        - Each entry shows:
+        - Short SHA
+        - Commit message (truncated)
+        - Author + date
+        - Tooltip (hover):  
+        - Full SHA  
+        - Origin hint (from reflog, e.g., `main@{2025-08-17 05:09}`)  
+        - Status: *Recoverable* / *Unreachable (subject to GC)*  
+
+        ---
+
+        ### Commits Panel
+        - Clicking a lost commit loads it in **Commits Panel**:
+        - Single node row (no branch labels).
+        - Commit details (hash, author, date, message).
+        - Supports multi-select (e.g., recover multiple commits).
+
+        ---
+
+        ### Changes Panel
+        - Shows file changes for the lost commit using:  
+        `git show -p <sha>`  
+
+        ### Diff Viewer
+        - Same as normal commit diff:
+        - Added/removed files, hunks, syntax highlighting.
+
+        ---
+
+        ### Context Menu (Lost Commit)
+        - **Checkout (detached HEAD)** → `git checkout <sha>`
+        - **Create branch here…** → `git branch <name> <sha>`
+        - **Create tag here…** → `git tag -a <name> <sha>`
+        - **Cherry-pick onto current branch** → `git cherry-pick <sha>`
+        - **Open diff vs…**
+        - Working tree → `git diff <sha>`
+        - Branch… → `git diff <branch> <sha>`
+        - **Restore file(s)…** → `git restore --source=<sha> <path>`
+        - **Show patch** → `git show <sha> --patch`
+        - **Copy SHA**
+
+        ---
+
+        ### Safety & UX
+        - Show banner when expanded:  
+        > “These commits are not referenced by any branch or tag. They may be garbage-collected. Create a branch or tag to keep them.”
+        - Display GC expiry hints if available:  
+        - `git config --get gc.reflogExpire`  
+        - `git config --get gc.pruneExpire`
+        - Confirm before destructive actions (e.g., dropping from reflog, if supported).
+        - Multi-select:
+        - **Recover selected** (create branches from all).
+        - **Cherry-pick selected**.
+        - Paginate list if more than 200 entries (load more).
+
+        ---
+
+        ### Settings
+        - Enable/disable **Lost & Found** section (default: on).
+        - Toggle **Deep scan** with `git fsck` (default: off).
+        - Limit: maximum N days old (default 90).
+        - Limit max items (default 200).
+
+        ---
+
+
+
+
+    ## Commits Panel Context Menu
+
+        ### Single Commit (Right-click on a commit)
+
+            - **Checkout this commit (detached HEAD)**  
+            → `git checkout <sha>`
+
+            - **Create new branch from commit…**  
+            → prompt name → `git branch <new> <sha>`
+
+            - **Create new tag from commit…**  
+            → prompt name/message → `git tag -a <tag> <sha> -m "<msg>"`
+
+            - **Cherry-pick commit onto current branch**  
+            → `git cherry-pick <sha>`
+
+            - **Revert commit**  
+            → `git revert <sha>`
+
+            - **Compare commit with…**  
+            - Previous commit (default) → `git diff <sha>^ <sha>`  
+            - Working directory → `git diff <sha>`  
+            - Any branch… → `git diff <branch> <sha>`
+
+            - **Copy**  
+            - Copy short SHA  
+            - Copy full SHA  
+            - Copy commit message
+
+            - **View patch (raw diff)**  
+            → `git show <sha> --patch`
+
+            - **Blame this commit (open file history for commit’s files)**  
+            → opens Changes/Diff scoped to this commit.
+
+            ---
+
+        ### Multiple Commits (Multi-select)
+
+            - **Compare selected commits (squash diff)**  
+            - Contiguous range → `git diff <first>^ <last>`  
+            - Non-contiguous → virtual merge diff across selected commits.
+
+            - **Cherry-pick selected commits (in order)**  
+            → `git cherry-pick <sha1> <sha2> …`
+
+            - **Revert selected commits**  
+            → `git revert <sha1> <sha2> …`
+
+            - **Create branch from last selected commit**  
+            → `git branch <new> <sha>`
+
+            - **Export patch file…**  
+            → `git format-patch <sha1>^..<shaN>`
+
+            ---
+
+        ### Uncommitted Changes (Synthetic commit at top)
+
+            - **Commit staged changes…**  
+            → open commit input  
+            - **Amend last commit**  
+            → `git commit --amend`  
+            - **Stash changes…**  
+            - Stash all / keep index / include untracked  
+            - **Discard changes…**  
+            - Entire working directory  
+            - Per file (via Changes panel)  
+
+            ---
+
+        ### Navigation / History
+
+            - **Show file history from this commit**  
+            → `git log -- <file>` filtered by commit’s file list  
+            - **Open on remote (GitHub/GitLab/Bitbucket)**  
+            → opens commit in web UI if remote URL is known  
+            - **Mark as baseline (for diff)**  
+            → set as left side of comparison, then select another commit to diff against  
+
+            ---
+
+        ### Safety & UX
+
+            - Disable destructive actions (`revert`, `cherry-pick`) when a rebase/merge is in progress.  
+            - Confirm on destructive multi-select (e.g., revert 10 commits).  
+            - On cherry-pick/revert conflict, surface **Continue / Abort** options directly in the Commits panel.  
+            - Keyboard shortcuts:  
+            - `C` = Checkout commit  
+            - `B` = Create branch from commit  
+            - `T` = Tag commit  
+            - `P` = Cherry-pick  
+            - `R` = Revert  
+            - `D` = Diff against…  
+            - `Ctrl+C` = Copy SHA  
+
+            ---
+
+
+    ## Commits requirement refine around multiple commit selection
+
+    ## Put Some buttons like push/pull, configuration, etc.. in header right cornor
+
+    ## Test and make sure File diff is correct in all situation .. for uncommitted changes, easier to see and maintain,...
+
+    ## BUG:::: When loading the main panel, commit is highlighted but not actually selected

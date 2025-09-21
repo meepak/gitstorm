@@ -124,6 +124,30 @@ export class WorkingDirectoryHandler {
         }
     }
 
+    async handleGetWorkingChanges(): Promise<void> {
+        try {
+            console.log('Getting working changes (both uncommitted and staged)');
+            const { uncommitted, staged } = await this.panel.gitService.getWorkingChanges();
+            
+            // Send updates for both sections
+            this.panel.panel.webview.postMessage({
+                command: 'updateUncommittedChanges',
+                files: uncommitted
+            });
+
+            this.panel.panel.webview.postMessage({
+                command: 'updateStagedChanges',
+                files: staged
+            });
+        } catch (error) {
+            console.error('Error getting working changes:', error);
+            this.panel.panel.webview.postMessage({
+                command: 'error',
+                error: error instanceof Error ? error.message : 'Failed to get working changes'
+            });
+        }
+    }
+
     async handleStageAllChanges(): Promise<void> {
         try {
             console.log('Staging all changes');
@@ -168,16 +192,20 @@ export class WorkingDirectoryHandler {
 
     async handleUnstageAllChanges(): Promise<void> {
         try {
-            console.log('Unstaging all changes');
-            await this.panel.gitService.unstageAllChanges();
+            console.log('=== UNSTAGE ALL CHANGES DEBUG ===');
+            console.log('handleUnstageAllChanges called');
+            const result = await this.panel.gitService.unstageAllChanges();
+            console.log('unstageAllChanges result:', result);
             
             // Refresh both uncommitted and staged changes
+            console.log('Refreshing working changes after unstage all');
             await this.refreshWorkingChanges();
             
             this.panel.panel.webview.postMessage({
                 command: 'success',
                 message: 'All changes unstaged successfully'
             });
+            console.log('=== END UNSTAGE ALL CHANGES DEBUG ===');
         } catch (error) {
             console.error('Error unstaging all changes:', error);
             this.panel.panel.webview.postMessage({
@@ -313,13 +341,35 @@ export class WorkingDirectoryHandler {
         }
     }
 
+    async handleDiscardAllChanges(): Promise<void> {
+        try {
+            console.log('Discarding all changes');
+            await this.panel.gitService.discardAllChanges();
+            
+            // Refresh the panel after discarding
+            await this.panel.refresh();
+            
+            this.panel.panel.webview.postMessage({
+                command: 'success',
+                message: 'All changes discarded successfully'
+            });
+        } catch (error) {
+            console.error('Error discarding all changes:', error);
+            this.panel.panel.webview.postMessage({
+                command: 'error',
+                error: error instanceof Error ? error.message : 'Failed to discard all changes'
+            });
+        }
+    }
+
     private async refreshWorkingChanges(): Promise<void> {
         try {
-            // Get both uncommitted and staged changes
-            const [uncommittedChanges, stagedChanges] = await Promise.all([
-                this.panel.gitService.getUncommittedChanges(),
-                this.panel.gitService.getStagedChanges()
-            ]);
+            // Get both uncommitted and staged changes in one optimized call
+            const { uncommitted: uncommittedChanges, staged: stagedChanges } = await this.panel.gitService.getWorkingChanges();
+
+            console.log('Refreshing working changes:');
+            console.log('Uncommitted files:', uncommittedChanges.map(f => f.file));
+            console.log('Staged files:', stagedChanges.map(f => f.file));
 
             // Update both sections
             this.panel.panel.webview.postMessage({

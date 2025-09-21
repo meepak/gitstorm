@@ -210,4 +210,12 @@ export class GitOperations {
     getRepoRoot(): string {
         return this.workingDirOps.getRepoRoot();
     }
+
+    async discardAllChanges(): Promise<boolean> {
+        return this.workingDirOps.discardAllChanges();
+    }
+
+    async getWorkingChanges(): Promise<{ uncommitted: FileChange[], staged: FileChange[] }> {
+        return this.workingDirOps.getWorkingChanges();
+    }
 }

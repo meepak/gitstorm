@@ -42,7 +42,7 @@ export class GitStormPanel {
                     vscode.Uri.joinPath(extensionUri, 'src'),
                     vscode.Uri.joinPath(extensionUri, 'out')
                 ],
-                retainContextWhenHidden: false
+                retainContextWhenHidden: true
             }
         );
 
@@ -111,22 +111,30 @@ export class GitStormPanel {
                 hasStagedChanges = await this._gitService.hasStagedChanges();
             }
 
+            // Get workspace root
+            const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+            
             this._panel.webview.postMessage({
                 command: 'updateContent',
                 branches: branches,
                 commits: commits,
                 hasUncommittedChanges: hasUncommittedChanges,
-                hasStagedChanges: hasStagedChanges
+                hasStagedChanges: hasStagedChanges,
+                workspaceRoot: workspaceRoot
             });
         } catch (error) {
             console.error('Error loading initial data:', error);
+            // Get workspace root
+            const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+            
             this._panel.webview.postMessage({
                 command: 'updateContent',
                 branches: [],
                 commits: [],
                 error: error instanceof Error ? error.message : 'Unknown error',
                 hasUncommittedChanges: false,
-                hasStagedChanges: false
+                hasStagedChanges: false,
+                workspaceRoot: workspaceRoot
             });
         }
     }

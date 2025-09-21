@@ -34,7 +34,7 @@
     "vscode:prepublish": "npm run compile",
     "compile": "npm run compile:ts && npm run copy:webview",
     "compile:ts": "tsc -p ./",
-    "copy:webview": "mkdir -p out/webview/renderers out/webview/handlers out/webview/managers out/webview/operations out/webview/core out/templates out/styles out/assets/svg && cp -r src/webview/* out/webview/ && cp src/templates/* out/templates/ && cp src/styles/* out/styles/ && cp src/assets/svg/* out/assets/svg/",
+    "copy:webview": "mkdir -p out/webview/renderers out/webview/handlers out/webview/managers out/webview/operations out/webview/core out/webview/components out/templates out/styles out/assets/svg && cp -r src/webview/* out/webview/ && cp src/templates/* out/templates/ && cp src/styles/* out/styles/ && cp src/assets/svg/* out/assets/svg/",
     "watch": "npm run copy:webview && tsc -watch -p ./"
   },
   "devDependencies": {

@@ -99,6 +99,12 @@ function showFileContextMenu(event, fileName, commitHash) {
     panelController.contextMenuHandler.showContextMenu(event.clientX, event.clientY, 'file', { fileName, commitHash });
 }
 
+function showDiffFileContextMenu(event, fileName, commitHash) {
+    event.preventDefault();
+    event.stopPropagation();
+    panelController.contextMenuHandler.showContextMenu(event.clientX, event.clientY, 'diff-file', { fileName, commitHash });
+}
+
 function toggleDirectory(dirId) {
     const children = document.getElementById(dirId);
     const toggle = document.getElementById(`toggle-${dirId}`);
@@ -239,6 +245,99 @@ function openWorkingFile(filePath) {
     panelController.gitOperations.openFile(filePath);
 }
 
+// ===== BUTTON SPINNER MANAGEMENT =====
+function setButtonLoading(buttonSelector, isLoading) {
+    const button = document.querySelector(buttonSelector);
+    if (button) {
+        if (isLoading) {
+            button.classList.add('loading');
+            button.disabled = true;
+        } else {
+            button.classList.remove('loading');
+            button.disabled = false;
+        }
+    }
+}
+
+function setAllButtonsLoading(buttonSelectors, isLoading) {
+    buttonSelectors.forEach(selector => {
+        setButtonLoading(selector, isLoading);
+    });
+}
+
+// New functions for uncommitted changes management
+function stageAllChanges() {
+    // Set loading state for stage all button
+    setButtonLoading('.stage-all-btn', true);
+    
+    panelController.gitOperations.stageAllChanges();
+}
+
+function unstageAllChanges() {
+    console.log('=== FRONTEND UNSTAGE ALL DEBUG ===');
+    console.log('unstageAllChanges function called');
+    console.log('panelController:', !!panelController);
+    console.log('panelController.gitOperations:', !!panelController?.gitOperations);
+    
+    // Set loading state for unstage all button
+    setButtonLoading('.unstage-all-btn', true);
+    
+    if (panelController && panelController.gitOperations) {
+        console.log('Calling panelController.gitOperations.unstageAllChanges()');
+        panelController.gitOperations.unstageAllChanges();
+    } else {
+        console.error('panelController or gitOperations not available');
+        // Reset loading state on error
+        setButtonLoading('.unstage-all-btn', false);
+    }
+    console.log('=== END FRONTEND UNSTAGE ALL DEBUG ===');
+}
+
+function discardAllChanges() {
+    panelController.gitOperations.discardAllChanges();
+}
+
+// Individual file action functions
+function stageFile(filePath) {
+    // Set loading state for the specific stage button
+    const stageBtn = document.querySelector(`button[onclick*="stageFile('${filePath}')"]`);
+    if (stageBtn) {
+        setButtonLoading(`button[onclick*="stageFile('${filePath}')"]`, true);
+    }
+    
+    panelController.gitOperations.stageFile(filePath);
+}
+
+function unstageFile(filePath) {
+    // Set loading state for the specific unstage button
+    const unstageBtn = document.querySelector(`button[onclick*="unstageFile('${filePath}')"]`);
+    if (unstageBtn) {
+        setButtonLoading(`button[onclick*="unstageFile('${filePath}')"]`, true);
+    }
+    
+    panelController.gitOperations.unstageFile(filePath);
+}
+
+// Toggle section collapse/expand
+function toggleSection(sectionId) {
+    const sectionHeader = document.querySelector(`[onclick="toggleSection('${sectionId}')"]`);
+    const sectionContent = document.getElementById(sectionId === 'uncommittedChangesSection' ? 'uncommittedChangesList' : 'stagedChangesList');
+    
+    if (sectionHeader && sectionContent) {
+        const isCollapsed = sectionHeader.classList.contains('collapsed');
+        
+        if (isCollapsed) {
+            // Expand section
+            sectionHeader.classList.remove('collapsed');
+            sectionContent.classList.remove('collapsed');
+        } else {
+            // Collapse section
+            sectionHeader.classList.add('collapsed');
+            sectionContent.classList.add('collapsed');
+        }
+    }
+}
+
 // Initialize when DOM is ready and all scripts are loaded
 document.addEventListener('DOMContentLoaded', () => {
     // Wait a bit to ensure all scripts are loaded
@@ -293,6 +392,7 @@ window.showBranchContextMenu = showBranchContextMenu;
 window.showCommitContextMenu = showCommitContextMenu;
 window.showUncommittedChangesContextMenu = showUncommittedChangesContextMenu;
 window.showFileContextMenu = showFileContextMenu;
+window.showDiffFileContextMenu = showDiffFileContextMenu;
 window.showDirectoryContextMenu = showDirectoryContextMenu;
 window.showPanelContextMenu = showPanelContextMenu;
 window.clearSearch = clearSearch;
@@ -314,3 +414,8 @@ window.showMultiCommitFileDiff = showMultiCommitFileDiff;
 window.showFileDiffWithCompare = showFileDiffWithCompare;
 window.showEditableDiff = showEditableDiff;
 window.openWorkingFile = openWorkingFile;
+window.stageAllChanges = stageAllChanges;
+window.unstageAllChanges = unstageAllChanges;
+window.discardAllChanges = discardAllChanges;
+window.stageFile = stageFile;
+window.unstageFile = unstageFile;
