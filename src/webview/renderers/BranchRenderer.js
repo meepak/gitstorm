@@ -4,7 +4,7 @@ class BranchRenderer {
         this.panel = panelController;
     }
 
-    generateBranchesHtml(branches, selectedBranch, searchTerm = '') {
+    generateBranchesHtml(branches, stashes, selectedBranch, searchTerm = '') {
         if (!branches || branches.length === 0) {
             return '<div class="empty-state"><h3>No branches found</h3></div>';
         }
@@ -50,6 +50,20 @@ class BranchRenderer {
             `;
         }
 
+        // Stashes section
+        if (stashes && stashes.length > 0) {
+            html += `
+                <div class="tree-section">
+                    <div class="tree-section-header">
+                        <div class="tree-section-title">Stashes</div>
+                    </div>
+                    <div class="tree-section-content" id="stashes-content">
+                        ${this.generateStashItemsHtml(stashes)}
+                    </div>
+                </div>
+            `;
+        }
+
         // Local branches section
         if (localBranches.length > 0) {
             html += `
@@ -85,6 +99,24 @@ class BranchRenderer {
         }
 
         return html;
+    }
+
+    generateStashItemsHtml(stashes) {
+        return stashes.map(stash => {
+            const displayMessage = stash.message || `On ${stash.branch}: ${stash.commitSubject}`;
+            
+            return `
+                <div class="stash-item" 
+                     onclick="selectStash('${stash.name}')" 
+                     oncontextmenu="event.preventDefault(); showStashContextMenu(event, '${stash.name}')">
+                    <div class="branch-icon">📦</div>
+                    <div class="stash-info">
+                        <div class="stash-name">${stash.name}</div>
+                        <div class="stash-message">${displayMessage}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
     }
 
     generateBranchItemsHtml(branches, selectedBranch) {

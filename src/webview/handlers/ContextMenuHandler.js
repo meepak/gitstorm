@@ -56,6 +56,9 @@ class ContextMenuHandler {
             case 'branch':
                 this.showBranchContextMenu();
                 break;
+            case 'stash':
+                this.showStashContextMenu();
+                break;
             case 'commit':
                 this.showCommitContextMenu();
                 break;
@@ -113,6 +116,15 @@ class ContextMenuHandler {
         this.contextMenu.querySelector('[data-action="checkout"]').style.display = 'flex';
         this.contextMenu.querySelector('[data-action="merge"]').style.display = 'flex';
         this.contextMenu.querySelector('[data-action="delete-branch"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="refresh"]').style.display = 'flex';
+    }
+
+    showStashContextMenu() {
+        // Show stash-specific actions
+        this.contextMenu.querySelector('[data-action="apply-stash"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="pop-stash"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="drop-stash"]').style.display = 'flex';
+        this.contextMenu.querySelector('[data-action="create-branch-from-stash"]').style.display = 'flex';
         this.contextMenu.querySelector('[data-action="refresh"]').style.display = 'flex';
     }
 
@@ -293,6 +305,26 @@ class ContextMenuHandler {
                 break;
             case 'refresh':
                 this.panel.refreshData();
+                break;
+            case 'apply-stash':
+                if (type === 'stash') {
+                    this.panel.gitOperations.applyStash(data.stashName);
+                }
+                break;
+            case 'pop-stash':
+                if (type === 'stash') {
+                    this.panel.gitOperations.popStash(data.stashName);
+                }
+                break;
+            case 'drop-stash':
+                if (type === 'stash') {
+                    this.panel.gitOperations.dropStash(data.stashName);
+                }
+                break;
+            case 'create-branch-from-stash':
+                if (type === 'stash') {
+                    this.panel.gitOperations.createBranchFromStash(data.stashName);
+                }
                 break;
         }
         

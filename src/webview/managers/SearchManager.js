@@ -76,7 +76,7 @@ class SearchManager {
         console.log('Filtering branches with search term:', this.panel.searchTerm);
         const branchesContent = document.getElementById('branchesContent');
         if (branchesContent && this.panel.branches) {
-            const newHtml = this.panel.uiRenderer.generateBranchesHtml(this.panel.branches, this.panel.currentBranch, this.panel.searchTerm);
+            const newHtml = this.panel.uiRenderer.generateBranchesHtml(this.panel.branches, this.panel.stashes, this.panel.currentBranch, this.panel.searchTerm);
             branchesContent.innerHTML = newHtml;
             
             // If we're searching, auto-expand all sections to show results

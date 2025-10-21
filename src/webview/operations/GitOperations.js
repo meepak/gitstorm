@@ -836,6 +836,45 @@ class GitOperations {
         }
     }
 
+    // Stash operations
+    applyStash(stashName) {
+        console.log('Applying stash:', stashName);
+        this.panel.messageHandler.sendMessage('applyStash', { stashName });
+    }
+
+    popStash(stashName) {
+        console.log('Popping stash:', stashName);
+        this.panel.messageHandler.sendMessage('popStash', { stashName });
+    }
+
+    dropStash(stashName) {
+        console.log('Dropping stash:', stashName);
+        // Show confirmation dialog
+        const confirmDialog = this.getConfirmationDialog();
+        if (!confirmDialog) {
+            // Fallback to native confirm if dialog not available
+            if (confirm(`Are you sure you want to drop ${stashName}? This action cannot be undone.`)) {
+                this.panel.messageHandler.sendMessage('dropStash', { stashName });
+            }
+            return;
+        }
+        
+        confirmDialog.show({
+            title: 'Drop Stash',
+            message: `Are you sure you want to drop ${stashName}? This action cannot be undone.`,
+            confirmText: 'Drop',
+            cancelText: 'Cancel',
+            onConfirm: () => {
+                this.panel.messageHandler.sendMessage('dropStash', { stashName });
+            }
+        });
+    }
+
+    createBranchFromStash(stashName) {
+        console.log('Creating branch from stash:', stashName);
+        this.panel.messageHandler.sendMessage('createBranchFromStash', { stashName });
+    }
+
     // Directory operations
     toggleDirectory(directoryName) {
         const content = document.getElementById(`${directoryName}-content`);

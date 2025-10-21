@@ -98,6 +98,10 @@ export class GitStormPanel {
             const branches = await this._gitService.getBranches();
             console.log('Loaded branches:', branches);
 
+            console.log('Getting stashes...');
+            const stashes = await this._gitService.getStashes();
+            console.log('Loaded stashes:', stashes);
+
             console.log('Getting commits for branch:', this._selectedBranch);
             const commits = await this._gitService.getCommits(this._selectedBranch || undefined);
             console.log('Loaded commits:', commits);
@@ -117,6 +121,7 @@ export class GitStormPanel {
             this._panel.webview.postMessage({
                 command: 'updateContent',
                 branches: branches,
+                stashes: stashes,
                 commits: commits,
                 hasUncommittedChanges: hasUncommittedChanges,
                 hasStagedChanges: hasStagedChanges,
@@ -130,6 +135,7 @@ export class GitStormPanel {
             this._panel.webview.postMessage({
                 command: 'updateContent',
                 branches: [],
+                stashes: [],
                 commits: [],
                 error: error instanceof Error ? error.message : 'Unknown error',
                 hasUncommittedChanges: false,

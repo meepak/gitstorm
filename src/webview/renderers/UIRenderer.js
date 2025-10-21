@@ -11,7 +11,7 @@ class UIRenderer {
         this.iconRenderer = new IconRenderer(panelController);
     }
 
-    updateContent(branches, commits, error, hasUncommittedChanges = false, hasStagedChanges = false) {
+    updateContent(branches, commits, stashes, error, hasUncommittedChanges = false, hasStagedChanges = false) {
         // Store current filter values before updating
         const currentUserFilter = this.panel.selectedUser;
         const currentCommitsCompare = this.panel.commitsCompareAgainst;
@@ -23,7 +23,7 @@ class UIRenderer {
             if (error) {
                 branchesContent.innerHTML = `<div class="empty-state"><h3>Error</h3><p>${error}</p></div>`;
             } else if (branches && branches.length > 0) {
-                branchesContent.innerHTML = this.generateBranchesHtml(branches, this.panel.currentBranch, this.panel.searchTerm);
+                branchesContent.innerHTML = this.generateBranchesHtml(branches, stashes, this.panel.currentBranch, this.panel.searchTerm);
             } else {
                 branchesContent.innerHTML = '<div class="loading">Loading branches...</div>';
             }
@@ -60,8 +60,8 @@ class UIRenderer {
     }
 
     // Delegate methods to specialized renderers
-    generateBranchesHtml(branches, selectedBranch, searchTerm = '') {
-        return this.branchRenderer.generateBranchesHtml(branches, selectedBranch, searchTerm);
+    generateBranchesHtml(branches, stashes, selectedBranch, searchTerm = '') {
+        return this.branchRenderer.generateBranchesHtml(branches, stashes, selectedBranch, searchTerm);
     }
 
     generateBranchItemsHtml(branches, selectedBranch) {

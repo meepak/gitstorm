@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { simpleGit, SimpleGit } from 'simple-git';
-import { Branch, Commit, FileChange } from './gitInterfaces';
+import { Branch, Commit, FileChange, Stash } from './gitInterfaces';
 import { GitOperations } from './gitOperations';
 
 export class GitService {
@@ -208,10 +208,38 @@ export class GitService {
         return await this.operations.getWorkingChanges();
     }
 
+    async getStashes(): Promise<Stash[]> {
+        return await this.operations.getStashes();
+    }
+
+    async applyStash(stashName: string): Promise<boolean> {
+        return await this.operations.applyStash(stashName);
+    }
+
+    async popStash(stashName: string): Promise<boolean> {
+        return await this.operations.popStash(stashName);
+    }
+
+    async dropStash(stashName: string): Promise<boolean> {
+        return await this.operations.dropStash(stashName);
+    }
+
+    async createBranchFromStash(stashName: string, branchName: string): Promise<boolean> {
+        return await this.operations.createBranchFromStash(stashName, branchName);
+    }
+
+    async showStash(stashName: string): Promise<string> {
+        return await this.operations.showStash(stashName);
+    }
+
+    async getStashFiles(stashName: string): Promise<FileChange[]> {
+        return await this.operations.getStashFiles(stashName);
+    }
+
     dispose(): void {
         this.disposables.forEach(d => d.dispose());
     }
 }
 
 // Re-export interfaces for convenience
-export { Branch, Commit, FileChange } from './gitInterfaces';
+export { Branch, Commit, FileChange, Stash } from './gitInterfaces';

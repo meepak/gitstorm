@@ -16,7 +16,8 @@ class MessageHandler {
                 case 'updateContent':
                     console.log('Processing updateContent:', { 
                         branches: message.branches?.length, 
-                        commits: message.commits?.length, 
+                        commits: message.commits?.length,
+                        stashes: message.stashes?.length, 
                         error: message.error, 
                         hasUncommittedChanges: message.hasUncommittedChanges,
                         hasStagedChanges: message.hasStagedChanges
@@ -25,7 +26,7 @@ class MessageHandler {
                     this.panel.hidePanelLoadingStates();
                     // Stop refresh animation when data arrives
                     this.panel.stopRefreshAnimation();
-                    this.panel.updateContent(message.branches, message.commits, message.error, message.hasUncommittedChanges, message.hasStagedChanges);
+                    this.panel.updateContent(message.branches, message.commits, message.stashes, message.error, message.hasUncommittedChanges, message.hasStagedChanges);
                     break;
                     
                 case 'updatePanelSizes':
@@ -96,6 +97,10 @@ class MessageHandler {
 
                 case 'success':
                     this.handleSuccess(message.message);
+                    break;
+
+                case 'stashDetails':
+                    this.handleStashDetails(message.stashName, message.files);
                     break;
                     
                 default:
@@ -393,6 +398,33 @@ class MessageHandler {
         console.log('Success message received:', message);
         // Reset all loading states on success
         this.resetAllLoadingStates();
+    }
+
+    handleStashDetails(stashName, files) {
+        console.log('handleStashDetails called with:', { stashName, files: files?.length });
+        
+        // Store current files for search functionality
+        this.panel.currentFiles = files || [];
+        this.panel.selectedCommit = null;
+        
+        // Restore normal layout
+        if (this.panel.gitOperations) {
+            this.panel.gitOperations.restoreNormalLayout();
+        }
+        
+        const filesContent = document.getElementById('filesContent');
+        if (filesContent) {
+            // Generate the file changes layout
+            const layoutHtml = this.panel.uiRenderer.generateFileChangesLayout({ hash: stashName, message: `Stash: ${stashName}` }, files);
+            filesContent.innerHTML = layoutHtml;
+            
+            // Update the footer
+            const filesFooter = document.getElementById('filesFooter');
+            if (filesFooter) {
+                filesFooter.innerHTML = this.panel.uiRenderer.generateCommitDetailsHtml({ hash: stashName, message: `Stash: ${stashName}` });
+                filesFooter.style.display = 'block';
+            }
+        }
     }
 
     resetAllLoadingStates() {

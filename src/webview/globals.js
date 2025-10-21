@@ -64,6 +64,16 @@ function showBranchContextMenu(event, branchName) {
     panelController.contextMenuHandler.showContextMenu(event.clientX, event.clientY, 'branch', { branchName });
 }
 
+// Stash operations
+function selectStash(stashName) {
+    panelController.selectStash(stashName);
+}
+
+function showStashContextMenu(event, stashName) {
+    event.preventDefault();
+    panelController.contextMenuHandler.showContextMenu(event.clientX, event.clientY, 'stash', { stashName });
+}
+
 // Commit operations
 function selectCommit(commitHash, event = null) {
     const isMultiSelect = event && event.ctrlKey;
@@ -383,12 +393,14 @@ function initializePanel() {
 // Export for debugging
 window.panelController = null;
 window.selectBranch = selectBranch;
+window.selectStash = selectStash;
 window.selectCommit = selectCommit;
 window.selectUncommittedChanges = selectUncommittedChanges;
 window.selectFile = selectFile;
 window.selectFileOnly = selectFileOnly;
 window.toggleDirectory = toggleDirectory;
 window.showBranchContextMenu = showBranchContextMenu;
+window.showStashContextMenu = showStashContextMenu;
 window.showCommitContextMenu = showCommitContextMenu;
 window.showUncommittedChangesContextMenu = showUncommittedChangesContextMenu;
 window.showFileContextMenu = showFileContextMenu;

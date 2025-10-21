@@ -1,21 +1,24 @@
 import { SimpleGit } from 'simple-git';
-import { Branch, Commit, FileChange } from './gitInterfaces';
+import { Branch, Commit, FileChange, Stash } from './gitInterfaces';
 import { BranchOperations } from './operations/BranchOperations';
 import { CommitOperations } from './operations/CommitOperations';
 import { FileOperations } from './operations/FileOperations';
 import { WorkingDirectoryOperations } from './operations/WorkingDirectoryOperations';
+import { StashOperations } from './operations/StashOperations';
 
 export class GitOperations {
     private branchOps: BranchOperations;
     private commitOps: CommitOperations;
     private fileOps: FileOperations;
     private workingDirOps: WorkingDirectoryOperations;
+    private stashOps: StashOperations;
 
     constructor(private git: SimpleGit) {
         this.branchOps = new BranchOperations(git);
         this.commitOps = new CommitOperations(git);
         this.fileOps = new FileOperations(git);
         this.workingDirOps = new WorkingDirectoryOperations(git);
+        this.stashOps = new StashOperations(git);
         
         // Debug: Check what repository we're working with
         this.git.revparse(['--show-toplevel']).then(root => {
@@ -217,5 +220,34 @@ export class GitOperations {
 
     async getWorkingChanges(): Promise<{ uncommitted: FileChange[], staged: FileChange[] }> {
         return this.workingDirOps.getWorkingChanges();
+    }
+
+    // Stash Operations
+    async getStashes(): Promise<Stash[]> {
+        return this.stashOps.getStashes();
+    }
+
+    async applyStash(stashName: string): Promise<boolean> {
+        return this.stashOps.applyStash(stashName);
+    }
+
+    async popStash(stashName: string): Promise<boolean> {
+        return this.stashOps.popStash(stashName);
+    }
+
+    async dropStash(stashName: string): Promise<boolean> {
+        return this.stashOps.dropStash(stashName);
+    }
+
+    async createBranchFromStash(stashName: string, branchName: string): Promise<boolean> {
+        return this.stashOps.createBranchFromStash(stashName, branchName);
+    }
+
+    async showStash(stashName: string): Promise<string> {
+        return this.stashOps.showStash(stashName);
+    }
+
+    async getStashFiles(stashName: string): Promise<FileChange[]> {
+        return this.stashOps.getStashFiles(stashName);
     }
 }

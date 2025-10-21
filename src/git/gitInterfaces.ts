@@ -27,3 +27,12 @@ export interface FileChange {
     status: 'A' | 'D' | 'M' | 'R' | 'C' | 'U' | '?';
     commitHash?: string; // Optional commit hash for multi-commit scenarios
 }
+
+export interface Stash {
+    index: number;
+    name: string; // stash@{N}
+    message: string;
+    branch: string;
+    commit: string;
+    commitSubject: string;
+}

@@ -4,18 +4,21 @@ import { CommitHandler } from './CommitHandler';
 import { FileHandler } from './FileHandler';
 import { BranchHandler } from './BranchHandler';
 import { WorkingDirectoryHandler } from './WorkingDirectoryHandler';
+import { StashHandler } from './StashHandler';
 
 export class MessageHandler {
     private readonly _commitHandler: CommitHandler;
     private readonly _fileHandler: FileHandler;
     private readonly _branchHandler: BranchHandler;
     private readonly _workingDirectoryHandler: WorkingDirectoryHandler;
+    private readonly _stashHandler: StashHandler;
 
     constructor(private readonly panel: GitStormPanel) {
         this._commitHandler = new CommitHandler(panel);
         this._fileHandler = new FileHandler(panel);
         this._branchHandler = new BranchHandler(panel);
         this._workingDirectoryHandler = new WorkingDirectoryHandler(panel);
+        this._stashHandler = new StashHandler(panel);
     }
 
     async handleMessage(message: any) {
@@ -201,6 +204,30 @@ export class MessageHandler {
 
                 case 'openFileAtCommit':
                     await this._fileHandler.handleOpenFileAtCommit(message.fileName, message.commitHash);
+                    break;
+
+                case 'selectStash':
+                    await this._stashHandler.handleSelectStash(message.stashName);
+                    break;
+
+                case 'applyStash':
+                    await this._stashHandler.handleApplyStash(message.stashName);
+                    break;
+
+                case 'popStash':
+                    await this._stashHandler.handlePopStash(message.stashName);
+                    break;
+
+                case 'dropStash':
+                    await this._stashHandler.handleDropStash(message.stashName);
+                    break;
+
+                case 'createBranchFromStash':
+                    await this._stashHandler.handleCreateBranchFromStash(message.stashName);
+                    break;
+
+                case 'showStashDiff':
+                    await this._stashHandler.handleShowStashDiff(message.stashName, message.filePath);
                     break;
 
                 default:

@@ -7,6 +7,8 @@ class PanelController {
         this.lastClickedCommit = null;
         this.commits = [];
         this.branches = [];
+        this.stashes = [];
+        this.selectedStash = null;
         this.searchTerm = '';
         this.commitsSearchTerm = '';
         this.filesSearchTerm = '';
@@ -196,10 +198,11 @@ class PanelController {
     }
 
     // Main update content method - delegates to UI renderer
-    updateContent(branches, commits, error, hasUncommittedChanges = false, hasStagedChanges = false) {
+    updateContent(branches, commits, stashes, error, hasUncommittedChanges = false, hasStagedChanges = false) {
         console.log('Updating content:', { 
             branches: branches?.length, 
-            commits: commits?.length, 
+            commits: commits?.length,
+            stashes: stashes?.length, 
             error, 
             hasUncommittedChanges,
             hasStagedChanges,
@@ -215,13 +218,19 @@ class PanelController {
             console.log('Selected branch (what you\'re viewing):', this.currentBranch);
         }
 
+        // Store stashes
+        if (stashes) {
+            this.stashes = stashes;
+            console.log('Stashes:', stashes);
+        }
+
         // Store uncommitted and staged changes state
         this.hasUncommittedChanges = hasUncommittedChanges;
         this.hasStagedChanges = hasStagedChanges;
         
         // Cache the data for persistence (async, non-blocking)
         if (this.cacheManager) {
-            this.cacheManager.cacheData(branches, commits, hasUncommittedChanges, hasStagedChanges);
+            this.cacheManager.cacheData(branches, commits, stashes, hasUncommittedChanges, hasStagedChanges);
             
             // Cache dropdown data for smooth UI (async, non-blocking)
             this.cacheManager.cacheDropdownData(commits, branches);
@@ -237,7 +246,7 @@ class PanelController {
         }
         
         // Delegate to UI renderer
-        this.uiRenderer.updateContent(branches, commits, error, hasUncommittedChanges, hasStagedChanges);
+        this.uiRenderer.updateContent(branches, commits, stashes, error, hasUncommittedChanges, hasStagedChanges);
         
         // Ensure compare dropdown state is restored after content update
         setTimeout(() => {
@@ -284,6 +293,7 @@ class PanelController {
         this.currentBranch = branchName;
         this.selectedCommits.clear();
         this.lastClickedCommit = null;
+        this.selectedStash = null;
         
         // Reset file changes panel when branch changes
         const filesContent = document.getElementById('filesContent');
@@ -296,6 +306,9 @@ class PanelController {
         
         // Update branch highlighting
         this.updateBranchHighlighting(branchName);
+        
+        // Clear stash selection
+        this.updateStashHighlighting(null);
         
         // Check if there's a compare option selected
         if (this.commitsCompareAgainst && this.commitsCompareAgainst !== 'none') {
@@ -321,6 +334,62 @@ class PanelController {
         
         // Ensure compare dropdown state is properly restored
         this.restoreCompareDropdownState();
+    }
+
+    selectStash(stashName) {
+        console.log('selectStash called with:', stashName);
+        this.selectedStash = stashName;
+        this.currentBranch = null;
+        this.selectedCommits.clear();
+        this.lastClickedCommit = null;
+        
+        // Clear commits panel with an appropriate message
+        const commitsContent = document.getElementById('commitsContent');
+        if (commitsContent) {
+            commitsContent.innerHTML = `
+                <div class="empty-state">
+                    <h3>Stash Selected</h3>
+                    <p>Viewing stash: ${stashName}</p>
+                    <p style="font-size: 11px; color: var(--description-fg); margin-top: 8px;">
+                        Stashes don't have commits. The changes panel shows files in this stash.
+                    </p>
+                </div>
+            `;
+        }
+        
+        // Clear diff viewer
+        this.clearDiffViewer();
+        
+        // Update stash highlighting
+        this.updateStashHighlighting(stashName);
+        
+        // Clear branch selection
+        this.updateBranchHighlighting(null);
+        
+        // Request stash details from backend
+        this.vscode.postMessage({
+            command: 'selectStash',
+            stashName: stashName
+        });
+    }
+
+    updateStashHighlighting(selectedStash) {
+        // Update stash highlighting in the branches panel
+        const stashItems = document.querySelectorAll('.stash-item');
+        stashItems.forEach(item => {
+            const onclick = item.getAttribute('onclick');
+            if (onclick) {
+                const match = onclick.match(/selectStash\('([^']+)'\)/);
+                if (match) {
+                    const itemStashName = match[1];
+                    if (itemStashName === selectedStash) {
+                        item.classList.add('selected');
+                    } else {
+                        item.classList.remove('selected');
+                    }
+                }
+            }
+        });
     }
 
     selectCommit(commitHash, isMultiSelect = false, isRangeSelect = false) {
@@ -623,7 +692,8 @@ class PanelController {
             this.uiRenderer.updateContent(
                 this.cacheManager.dataCache.branches, 
                 this.cacheManager.dataCache.commits, 
-                null, 
+                this.cacheManager.dataCache.stashes,
+                null, // error
                 this.cacheManager.dataCache.hasUncommittedChanges, 
                 this.cacheManager.dataCache.hasStagedChanges
             );

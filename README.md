@@ -199,7 +199,6 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 
         Display:
             Clicking a stash loads its commits/diffs in the Commits panel, same as a branch.
-            Show staged vs unstaged changes (use stash commit’s parents).
             File changes panel supports same compare options (prev, working dir, other branch).
             Actions (context menu):
             Apply → git stash apply stash@{N}

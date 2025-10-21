@@ -45,24 +45,25 @@ class CacheManager {
     }
 
     // Cache data for persistence (optimized)
-    cacheData(branches, commits, hasUncommittedChanges, hasStagedChanges) {
+    cacheData(branches, commits, stashes, hasUncommittedChanges, hasStagedChanges) {
         // Use requestIdleCallback for non-blocking cache operations
         if (window.requestIdleCallback) {
             requestIdleCallback(() => {
-                this._performCacheOperation(branches, commits, hasUncommittedChanges, hasStagedChanges);
+                this._performCacheOperation(branches, commits, stashes, hasUncommittedChanges, hasStagedChanges);
             });
         } else {
             // Fallback for browsers without requestIdleCallback
             setTimeout(() => {
-                this._performCacheOperation(branches, commits, hasUncommittedChanges, hasStagedChanges);
+                this._performCacheOperation(branches, commits, stashes, hasUncommittedChanges, hasStagedChanges);
             }, 0);
         }
     }
 
-    _performCacheOperation(branches, commits, hasUncommittedChanges, hasStagedChanges) {
+    _performCacheOperation(branches, commits, stashes, hasUncommittedChanges, hasStagedChanges) {
         this.dataCache = {
             branches: branches ? [...branches] : null,
             commits: commits ? [...commits] : null,
+            stashes: stashes ? [...stashes] : null,
             currentFiles: this.panel.currentFiles ? [...this.panel.currentFiles] : null,
             selectedCommit: this.panel.selectedCommit ? { ...this.panel.selectedCommit } : null,
             hasUncommittedChanges: hasUncommittedChanges,
@@ -120,6 +121,7 @@ class CacheManager {
                     this.dataCache = {
                         branches: parsed.branches,
                         commits: parsed.commits,
+                        stashes: parsed.stashes,
                         currentFiles: parsed.currentFiles,
                         selectedCommit: parsed.selectedCommit,
                         hasUncommittedChanges: parsed.hasUncommittedChanges,
@@ -266,7 +268,8 @@ class CacheManager {
                 this.panel.uiRenderer.updateContent(
                     this.dataCache.branches, 
                     this.dataCache.commits, 
-                    null, 
+                    this.dataCache.stashes,
+                    null, // error
                     this.dataCache.hasUncommittedChanges, 
                     this.dataCache.hasStagedChanges
                 );
