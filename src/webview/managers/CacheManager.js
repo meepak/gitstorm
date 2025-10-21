@@ -476,6 +476,35 @@ class CacheManager {
         // The actual dropdown population is handled by populateDropdownsFromCache in PanelController
         return this.isDropdownCacheValid();
     }
+
+    // Cache branch sections collapsed state
+    cacheBranchSections() {
+        try {
+            const sectionsState = {
+                collapsedSections: this.panel.collapsedSections,
+                timestamp: Date.now()
+            };
+            
+            localStorage.setItem('gitstorm-branch-sections', JSON.stringify(sectionsState));
+        } catch (error) {
+            console.error('Error caching branch sections:', error);
+        }
+    }
+
+    // Restore branch sections collapsed state
+    restoreBranchSections() {
+        try {
+            const saved = localStorage.getItem('gitstorm-branch-sections');
+            if (saved) {
+                const data = JSON.parse(saved);
+                this.panel.collapsedSections = data.collapsedSections || { stashes: true };
+                return true;
+            }
+        } catch (error) {
+            console.error('Error restoring branch sections:', error);
+        }
+        return false;
+    }
 }
 
 // Make CacheManager globally available for debugging

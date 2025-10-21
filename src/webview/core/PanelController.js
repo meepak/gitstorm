@@ -27,6 +27,7 @@ class PanelController {
         this.hasUncommittedChanges = false;
         this.hasStagedChanges = false;
         this.workspaceRoot = null;
+        this.collapsedSections = { stashes: true }; // Stashes collapsed by default
         
         // Initialize cache manager
         console.log('PanelController: About to create CacheManager...', typeof CacheManager);
@@ -251,6 +252,7 @@ class PanelController {
         // Ensure compare dropdown state is restored after content update
         setTimeout(() => {
             this.restoreCompareDropdownState();
+            this.restoreBranchSectionsState();
         }, 100);
     }
 
@@ -685,6 +687,7 @@ class PanelController {
             dropdownsRestored = this.cacheManager.restoreDropdownData();
             compareSettingsRestored = this.cacheManager.restoreCompareSettings();
             panelSizesRestored = this.cacheManager.restorePanelSizes();
+            this.cacheManager.restoreBranchSections();
         }
         
         if (dataRestored) {
@@ -779,6 +782,46 @@ class PanelController {
             refreshButton.classList.remove('refreshing');
             refreshButton.disabled = false;
         }
+    }
+
+    // Toggle branch section collapse/expand
+    toggleBranchSection(sectionId) {
+        // Toggle the collapsed state
+        this.collapsedSections[sectionId] = !this.collapsedSections[sectionId];
+        
+        // Update the UI
+        const header = document.querySelector(`[onclick="panelController.toggleBranchSection('${sectionId}')"]`);
+        const content = document.getElementById(`${sectionId}-content`);
+        
+        if (header && content) {
+            if (this.collapsedSections[sectionId]) {
+                header.classList.add('collapsed');
+                content.classList.add('collapsed');
+            } else {
+                header.classList.remove('collapsed');
+                content.classList.remove('collapsed');
+            }
+        }
+        
+        // Cache the collapsed sections state
+        if (this.cacheManager) {
+            this.cacheManager.cacheBranchSections();
+        }
+    }
+
+    // Restore branch sections collapsed state
+    restoreBranchSectionsState() {
+        Object.keys(this.collapsedSections).forEach(sectionId => {
+            if (this.collapsedSections[sectionId]) {
+                const header = document.querySelector(`[onclick="panelController.toggleBranchSection('${sectionId}')"]`);
+                const content = document.getElementById(`${sectionId}-content`);
+                
+                if (header && content) {
+                    header.classList.add('collapsed');
+                    content.classList.add('collapsed');
+                }
+            }
+        });
     }
 
 }

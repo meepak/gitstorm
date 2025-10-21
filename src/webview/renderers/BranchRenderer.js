@@ -40,7 +40,8 @@ class BranchRenderer {
         if (currentBranch) {
             html += `
                 <div class="tree-section">
-                    <div class="tree-section-header">
+                    <div class="tree-section-header" onclick="panelController.toggleBranchSection('current')">
+                        <div class="tree-toggle">▼</div>
                         <div class="tree-section-title">Current</div>
                     </div>
                     <div class="tree-section-content" id="current-content">
@@ -54,10 +55,11 @@ class BranchRenderer {
         if (stashes && stashes.length > 0) {
             html += `
                 <div class="tree-section">
-                    <div class="tree-section-header">
+                    <div class="tree-section-header collapsed" onclick="panelController.toggleBranchSection('stashes')">
+                        <div class="tree-toggle">▼</div>
                         <div class="tree-section-title">Stashes</div>
                     </div>
-                    <div class="tree-section-content" id="stashes-content">
+                    <div class="tree-section-content collapsed" id="stashes-content">
                         ${this.generateStashItemsHtml(stashes)}
                     </div>
                 </div>
@@ -68,7 +70,8 @@ class BranchRenderer {
         if (localBranches.length > 0) {
             html += `
                 <div class="tree-section">
-                    <div class="tree-section-header">
+                    <div class="tree-section-header" onclick="panelController.toggleBranchSection('local')">
+                        <div class="tree-toggle">▼</div>
                         <div class="tree-section-title">Local</div>
                     </div>
                     <div class="tree-section-content" id="local-content">
@@ -83,7 +86,8 @@ class BranchRenderer {
             const originBranches = remoteGroups[origin];
             html += `
                 <div class="tree-section">
-                    <div class="tree-section-header">
+                    <div class="tree-section-header" onclick="panelController.toggleBranchSection('${origin}')">
+                        <div class="tree-toggle">▼</div>
                         <div class="tree-section-subtitle">${origin}</div>
                     </div>
                     <div class="tree-section-content" id="${origin}-content">
