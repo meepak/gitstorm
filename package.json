@@ -34,13 +34,14 @@
     "vscode:prepublish": "npm run compile",
     "compile": "npm run compile:ts && npm run copy:webview",
     "compile:ts": "tsc -p ./",
-    "copy:webview": "mkdir -p out/webview/renderers out/webview/handlers out/webview/managers out/webview/operations out/webview/core out/webview/components out/templates out/styles out/assets/svg && cp -r src/webview/* out/webview/ && cp src/templates/* out/templates/ && cp src/styles/* out/styles/ && cp src/assets/svg/* out/assets/svg/",
+    "copy:webview": "copyfiles -u 1 \"src/webview/**/*\" out/ && copyfiles -u 1 \"src/templates/*\" out/ && copyfiles -u 1 \"src/styles/*\" out/ && copyfiles -u 1 \"src/assets/svg/*\" out/",
     "watch": "npm run copy:webview && tsc -watch -p ./"
   },
   "devDependencies": {
     "@types/vscode": "^1.74.0",
     "@types/node": "16.x",
-    "typescript": "^4.9.4"
+    "typescript": "^4.9.4",
+    "copyfiles": "^2.4.1"
   },
   "dependencies": {
     "simple-git": "^3.19.1"
